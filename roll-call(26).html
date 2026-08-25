@@ -1,0 +1,3722 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roll Call — Submission Review</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  /* ============ DESIGN TOKENS ============ */
+  :root[data-theme="light"] {
+    --bg: #f3ede0;
+    --surface: #fffdf8;
+    --surface-2: #ece4d1;
+    --ink: #241f16;
+    --ink-soft: #6b6152;
+    --ink-faint: #a89d87;
+    --rule: #ddd0b0;
+    --rule-strong: #c9b98d;
+    --gold: #9c6b1f;
+    --gold-soft: #f1e2c0;
+    --stamp-red: #a63d2f;
+    --stamp-red-soft: #f3ddd7;
+    --stamp-green: #3f6b4a;
+    --stamp-green-soft: #dee8dd;
+    --shadow: rgba(60, 46, 20, 0.12);
+    --overlay: rgba(28, 22, 12, 0.55);
+  }
+  :root[data-theme="dark"] {
+    --bg: #141f1b;
+    --surface: #1b2723;
+    --surface-2: #22322c;
+    --ink: #ece5d3;
+    --ink-soft: #a4ab9f;
+    --ink-faint: #6c7a70;
+    --rule: #2e433c;
+    --rule-strong: #3d5850;
+    --gold: #dcae54;
+    --gold-soft: #33301c;
+    --stamp-red: #d97a6c;
+    --stamp-red-soft: #3a2420;
+    --stamp-green: #7bc296;
+    --stamp-green-soft: #1f322a;
+    --shadow: rgba(0, 0, 0, 0.35);
+    --overlay: rgba(6, 10, 8, 0.7);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+    transition: background .25s ease, color .25s ease;
+  }
+  .font-display { font-family: 'Fraunces', Georgia, serif; }
+  .font-mono { font-family: 'IBM Plex Mono', monospace; }
+
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 4px; }
+
+  button { font-family: inherit; cursor: pointer; }
+  input, select { font-family: inherit; }
+  a { color: inherit; }
+  .hidden { display: none !important; }
+
+  /* ============ LEDGER SPINE HEADER ============ */
+  .ledger-header {
+    height: 60px; flex-shrink: 0; z-index: 30;
+    background: var(--surface);
+    border-bottom: 2px solid var(--ink);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 38px; height: 38px; border-radius: 9px;
+    background: var(--ink); color: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 17px;
+  }
+  .brand-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; letter-spacing: .01em; line-height: 1.1; }
+  .brand-sub { font-size: 11px; color: var(--ink-soft); margin-top: 1px; }
+
+  .pill-tabs { display: flex; align-items: center; background: var(--surface-2); border: 1px solid var(--rule); border-radius: 10px; padding: 3px; gap: 2px; }
+  .pill-tab { padding: 6px 12px; font-size: 11.5px; font-weight: 600; border: none; background: transparent; color: var(--ink-soft); border-radius: 7px; display: flex; align-items: center; gap: 6px; transition: all .15s; }
+  .pill-tab.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px var(--shadow); }
+
+  .btn { border-radius: 10px; font-size: 12px; font-weight: 600; padding: 7px 13px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); display: inline-flex; align-items: center; gap: 6px; transition: all .15s; }
+  .btn:hover { border-color: var(--rule-strong); background: var(--surface-2); }
+  .btn-gold { background: var(--gold); color: var(--surface); border-color: var(--gold); }
+  .btn-gold:hover { filter: brightness(1.08); }
+  .btn-icon { width: 32px; height: 32px; padding: 0; justify-content: center; border-radius: 9px; }
+  .btn-ghost { border-color: transparent; background: transparent; }
+  .btn-ghost:hover { background: var(--surface-2); }
+
+  .theme-toggle { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--rule); background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--ink-soft); }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--rule-strong); }
+
+  /* ============ UPLOAD / LANDING VIEW ============ */
+  #uploadView { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; max-width: 760px; margin: 0 auto; width: 100%; gap: 28px; }
+  .landing-badge { display: inline-flex; padding: 12px; border-radius: 16px; background: var(--gold-soft); color: var(--gold); font-size: 26px; }
+  .landing-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 32px; text-align: center; letter-spacing: -.01em; line-height: 1.15; }
+  .landing-title em { font-style: italic; color: var(--gold); }
+  .landing-sub { font-size: 13.5px; color: var(--ink-soft); text-align: center; max-width: 520px; line-height: 1.6; }
+
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 20px; box-shadow: 0 6px 24px -8px var(--shadow); }
+  .import-card { width: 100%; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .field-label { font-size: 11px; font-weight: 700; color: var(--ink); display: flex; align-items: center; justify-content: space-between; }
+  .text-input { width: 100%; background: var(--bg); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px; font-size: 12px; color: var(--ink); outline: none; }
+  .text-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+
+  .divider-row { display: flex; align-items: center; width: 100%; gap: 12px; color: var(--ink-faint); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+  .divider-row .line { flex-grow: 1; height: 1px; background: var(--rule); }
+
+  #dropZone { width: 100%; border: 2px dashed var(--rule-strong); border-radius: 20px; padding: 30px; text-align: center; cursor: pointer; transition: all .2s; background: var(--surface); }
+  #dropZone:hover, #dropZone.drag-active { border-color: var(--gold); background: var(--gold-soft); }
+  .drop-icon { width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--rule); display: flex; align-items: center; justify-content: center; color: var(--gold); font-size: 22px; }
+
+  .demo-strip { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 16px; background: var(--gold-soft); border: 1px solid var(--rule-strong); }
+
+  /* ============ MAPPING MODAL ============ */
+  .modal-overlay { position: fixed; inset: 0; z-index: 50; background: var(--overlay); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal-box { width: 100%; max-width: 440px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+  .modal-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+  select.text-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b6152'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+
+  /* ============ DASHBOARD LAYOUT ============ */
+  #dashboardView { flex-grow: 1; display: flex; width: 100%; height: 100%; overflow: hidden; }
+
+  .roster { width: 300px; flex-shrink: 0; border-right: 1px solid var(--rule); background: var(--surface-2); display: flex; flex-direction: column; }
+  .roster-head { padding: 14px; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 9px; background: var(--surface); }
+  .roster-title-row { display: flex; align-items: center; justify-content: space-between; }
+  .roster-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 7px; }
+  .count-chip { font-family: 'IBM Plex Mono', monospace; font-size: 10px; background: var(--gold-soft); color: var(--gold); padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+
+  .filter-pills { display: flex; gap: 5px; overflow-x: auto; }
+  .filter-pill { flex-shrink: 0; padding: 5px 10px; border-radius: 8px; font-size: 10.5px; font-weight: 600; border: 1px solid var(--rule); background: var(--surface); color: var(--ink-soft); }
+  .filter-pill.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .roster-list { flex-grow: 1; overflow-y: auto; }
+  .roster-row { width: 100%; text-align: left; border: none; background: transparent; border-bottom: 1px solid var(--rule); padding: 11px 14px 11px 10px; display: flex; align-items: center; gap: 10px; position: relative; }
+  .roster-row:hover { background: var(--surface); }
+  .roster-row.selected { background: var(--surface); }
+  .roster-row.selected::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--gold); }
+  .punch-hole { width: 7px; height: 7px; border-radius: 50%; background: var(--bg); border: 1px solid var(--rule-strong); flex-shrink: 0; }
+  .roster-avatar { width: 30px; height: 30px; border-radius: 9px; background: var(--ink); color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10.5px; flex-shrink: 0; }
+  .roster-avatar.reviewed { background: var(--stamp-green); color: var(--surface); }
+  .roster-info { flex-grow: 1; min-width: 0; }
+  .roster-name-row { display: flex; align-items: center; gap: 6px; }
+  .roster-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .roster-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .tag-chip { font-size: 9.5px; font-weight: 700; background: var(--gold-soft); color: var(--gold); padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
+  .roster-date { font-size: 9.5px; color: var(--ink-faint); font-family: 'IBM Plex Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .attach-chip { font-size: 9.5px; font-weight: 700; color: var(--ink-soft); background: var(--surface); border: 1px solid var(--rule); padding: 2px 6px; border-radius: 20px; flex-shrink: 0; }
+  .converting-chip { font-size: 8.5px; font-weight: 700; background: var(--gold); color: var(--surface); padding: 1px 5px; border-radius: 4px; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+
+  .roster-foot { padding: 10px 14px; border-top: 1px solid var(--rule); background: var(--surface); display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
+
+  .main-panel { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); position: relative; }
+
+  .thread-head { padding: 14px 20px; border-bottom: 1px solid var(--rule); background: var(--surface); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .thread-avatar { width: 40px; height: 40px; border-radius: 12px; background: var(--ink); color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .thread-name { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .thread-sub { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; }
+  .stamp-chip { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; transform: rotate(-2deg); }
+  .stamp-chip.reviewed { background: var(--stamp-green-soft); color: var(--stamp-green); border: 1px solid var(--stamp-green); }
+
+  .stream { flex-grow: 1; overflow-y: auto; padding: 22px; }
+  .thread-content { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  .empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; }
+  .empty-icon { width: 60px; height: 60px; border-radius: 18px; background: var(--gold-soft); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+
+  .submission-card { padding: 16px; display: flex; flex-direction: column; gap: 10px; border-radius: 18px; }
+  .submission-card-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--rule); padding-bottom: 9px; font-size: 12px; }
+  .submission-text { font-size: 13px; line-height: 1.65; white-space: pre-wrap; color: var(--ink); }
+
+  .media-section-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+  .media-section-title { font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: 6px; }
+  .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 8px; }
+  .media-tile { aspect-ratio: 1; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--rule); overflow: hidden; position: relative; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .media-tile img { width: 100%; height: 100%; object-fit: cover; }
+  .media-tile .hover-veil { position: absolute; inset: 0; background: var(--overlay); opacity: 0; display: flex; align-items: center; justify-content: center; transition: opacity .15s; }
+  .media-tile:hover .hover-veil { opacity: 1; }
+  .veil-label { background: var(--surface); color: var(--ink); font-size: 10.5px; font-weight: 700; padding: 6px 10px; border-radius: 10px; display: flex; align-items: center; gap: 5px; }
+
+  .grading-box { margin-left: 46px; max-width: 720px; }
+  .grading-inner { padding: 14px; border-radius: 16px; background: var(--stamp-red-soft); border: 1px solid var(--stamp-red); display: flex; flex-direction: column; gap: 10px; }
+  .grading-head { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; font-weight: 700; color: var(--stamp-red); }
+  .grading-grid { display: grid; grid-template-columns: 90px 1fr; gap: 10px; }
+  .field-mini-label { font-size: 9.5px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; display: block; }
+
+  /* ============ GALLERY & QUESTIONS VIEWS ============ */
+  .view-toolbar { padding: 14px 20px; border-bottom: 1px solid var(--rule); background: var(--surface); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 10px; flex-wrap: wrap; }
+  .view-toolbar-title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .view-toolbar-sub { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; }
+  .view-scroll { flex-grow: 1; overflow-y: auto; padding: 20px; }
+
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; max-width: 1200px; margin: 0 auto; }
+  .gallery-card { padding: 12px; display: flex; flex-direction: column; gap: 8px; border-radius: 16px; }
+  .gallery-thumb { aspect-ratio: 4/3; border-radius: 11px; overflow: hidden; background: var(--surface-2); position: relative; }
+  .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .gallery-count-badge { position: absolute; top: 7px; right: 7px; font-size: 9.5px; font-weight: 700; background: var(--ink); color: var(--bg); padding: 2px 7px; border-radius: 20px; }
+
+  .qcard { padding: 18px; border-radius: 18px; display: flex; flex-direction: column; gap: 12px; max-width: 900px; margin: 0 auto 14px; }
+  .qcard-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--rule); padding-bottom: 11px; }
+  .qcard-text { font-size: 13px; line-height: 1.6; background: var(--surface-2); padding: 12px; border-radius: 12px; border: 1px solid var(--rule); white-space: pre-wrap; }
+
+  /* ============ LIGHTBOX ============ */
+  .lightbox-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(6,10,8,.92); backdrop-filter: blur(6px); display: flex; flex-direction: column; padding: 18px; }
+  .lightbox-head { display: flex; align-items: center; justify-content: space-between; color: #ece5d3; }
+  .lightbox-stage { flex-grow: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 14px 0; cursor: grab; user-select: none; }
+  .lightbox-stage:active { cursor: grabbing; }
+  .lightbox-stage img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.5); transition: transform .06s; pointer-events: none; user-select: none; }
+  .lightbox-foot { display: flex; align-items: center; justify-content: space-between; color: #a4ab9f; font-size: 11.5px; border-top: 1px solid #2e433c; padding-top: 12px; }
+  .lb-btn { background: #22322c; border: 1px solid #3d5850; color: #ece5d3; border-radius: 10px; padding: 6px 11px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; }
+  .lb-btn:hover { background: #2e433c; }
+  .lb-btn-icon { width: 32px; height: 32px; padding: 0; justify-content: center; }
+
+  /* ============ TOASTS ============ */
+  #toastStack { position: fixed; bottom: 18px; right: 18px; z-index: 70; display: flex; flex-direction: column; gap: 8px; }
+  .toast { pointer-events: auto; padding: 11px 15px; border-radius: 14px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 9px; box-shadow: 0 10px 30px var(--shadow); border: 1px solid; transform: translateY(6px); opacity: 0; transition: all .25s; background: var(--surface); color: var(--ink); border-color: var(--rule); }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--stamp-green); color: var(--stamp-green); }
+  .toast.error { border-color: var(--stamp-red); color: var(--stamp-red); }
+
+  @media (max-width: 760px) {
+    .roster { position: absolute; inset: 0; z-index: 20; width: 100%; }
+    .roster.tucked { display: none; }
+    .pill-tabs { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="ledger-header">
+  <div class="brand">
+    <div class="brand-mark">R</div>
+    <div>
+      <div class="brand-title">Roll Call <span style="font-weight:400;font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;">submission review</span></div>
+      <div class="brand-sub">Read spreadsheets like a conversation thread</div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div id="navTabs" class="pill-tabs hidden">
+      <button id="tabChatBtn" class="pill-tab active"><i class="fa-solid fa-message"></i> Thread</button>
+      <button id="tabGalleryBtn" class="pill-tab"><i class="fa-solid fa-grip"></i> Gallery</button>
+      <button id="tabQuestionsBtn" class="pill-tab"><i class="fa-solid fa-list-check"></i> All Responses</button>
+    </div>
+    <button id="loadDemoBtn" class="btn"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--gold);"></i> Try demo class</button>
+    <button id="resetAppBtn" class="btn hidden"><i class="fa-solid fa-arrow-left"></i> Change sheet</button>
+    <button id="themeToggleBtn" class="theme-toggle" title="Toggle light / dark"><i class="fa-solid fa-moon"></i></button>
+  </div>
+</header>
+
+<div id="appContainer" style="flex-grow:1;display:flex;overflow:hidden;position:relative;">
+
+  <!-- UPLOAD VIEW -->
+  <div id="uploadView">
+    <div class="landing-badge"><i class="fa-solid fa-chalkboard-user"></i></div>
+    <h2 class="landing-title">Grade submissions like you'd <em>read a message</em></h2>
+    <p class="landing-sub">Paste a Google Sheets link or drop an exported spreadsheet. Roll Call turns rows into a roster you can search, filter, and grade — student photos, questions, and homework tags included.</p>
+
+    <div class="card import-card">
+      <label class="field-label"><span><i class="fa-solid fa-link" style="color:var(--gold);"></i> Google Sheets link</span><span class="tag-chip">auto-fetch</span></label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="googleSheetUrlInput" class="text-input font-mono" placeholder="https://docs.google.com/spreadsheets/d/.../edit" style="flex-grow:1;">
+        <button id="loadGoogleSheetBtn" class="btn btn-gold" style="flex-shrink:0;"><i class="fa-solid fa-cloud-arrow-down"></i> Load</button>
+      </div>
+      <p style="font-size:10.5px;color:var(--ink-soft);display:flex;align-items:center;justify-content:space-between;">
+        <span><i class="fa-solid fa-circle-info"></i> Sharing must be "Anyone with the link can view".</span>
+        <button type="button" id="trySampleLinkBtn" style="color:var(--gold);font-weight:700;background:none;border:none;">Try sample</button>
+      </p>
+    </div>
+
+    <div class="divider-row" style="width:100%;"><div class="line"></div><span>or drop a file</span><div class="line"></div></div>
+
+    <div id="dropZone" class="card">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden">
+      <div class="drop-icon"><i class="fa-solid fa-file-csv"></i></div>
+      <p style="font-size:13px;font-weight:600;">Drag & drop a spreadsheet, or <span style="color:var(--gold);text-decoration:underline;">browse files</span></p>
+      <p style="font-size:11px;color:var(--ink-soft);margin-top:3px;">.xlsx, .xls, or .csv</p>
+    </div>
+
+    <div class="demo-strip">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--rule-strong);display:flex;align-items:center;justify-content:center;color:var(--gold);"><i class="fa-solid fa-rocket"></i></div>
+        <div><div style="font-size:12px;font-weight:700;">Want to try it first?</div><div style="font-size:11px;color:var(--ink-soft);">Loads a sample class with homework and photos.</div></div>
+      </div>
+      <button id="quickDemoBtn" class="btn btn-gold">Try demo</button>
+    </div>
+  </div>
+
+  <!-- MAPPING MODAL -->
+  <div id="mappingModal" class="modal-overlay hidden">
+    <div class="modal-box card">
+      <div style="border-bottom:1px solid var(--rule);padding-bottom:10px;">
+        <h3 class="modal-title"><i class="fa-solid fa-sliders" style="color:var(--gold);"></i> Match your columns</h3>
+        <p style="font-size:11px;color:var(--ink-soft);margin-top:3px;">Tell Roll Call which column is which — it guesses, you confirm.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div><label class="field-mini-label">Student name *</label><select id="colNameSelect" class="text-input"></select></div>
+        <div><label class="field-mini-label">Question / response text</label><select id="colTextSelect" class="text-input"></select></div>
+        <div><label class="field-mini-label">Image / attachment URLs *</label><select id="colUrlsSelect" class="text-input"></select></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><label class="field-mini-label">Homework / class</label><select id="colHomeworkSelect" class="text-input"></select></div>
+          <div><label class="field-mini-label">Date submitted</label><select id="colDateSelect" class="text-input"></select></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:4px;">
+        <button id="cancelMappingBtn" class="btn">Cancel</button>
+        <button id="confirmMappingBtn" class="btn btn-gold">Open roster</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboardView" class="hidden">
+    <aside class="roster" id="rosterPanel">
+      <div class="roster-head">
+        <div class="roster-title-row">
+          <div class="roster-title"><i class="fa-solid fa-users" style="color:var(--gold);"></i> Roster</div>
+          <span id="rosterCountBadge" class="count-chip">0 students</span>
+        </div>
+        <select id="homeworkFilterSelect" class="text-input" style="font-size:11px;padding:6px 10px;"><option value="all">All homeworks</option></select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div><label class="field-mini-label">From</label><input type="date" id="startDateFilterInput" class="text-input" style="font-size:11px;padding:6px 8px;"></div>
+          <div><label class="field-mini-label">To</label><input type="date" id="endDateFilterInput" class="text-input" style="font-size:11px;padding:6px 8px;"></div>
+        </div>
+        <div style="position:relative;">
+          <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:11px;top:10px;font-size:11px;color:var(--ink-faint);"></i>
+          <input type="text" id="searchInput" placeholder="Search students..." class="text-input" style="padding-left:30px;font-size:12px;">
+        </div>
+        <div class="filter-pills">
+          <button id="filterAll" class="filter-pill active">All</button>
+          <button id="filterHasImages" class="filter-pill">Has images</button>
+          <button id="filterReviewed" class="filter-pill">Reviewed</button>
+        </div>
+      </div>
+      <div id="studentListContainer" class="roster-list"></div>
+      <div class="roster-foot">
+        <span id="totalMediaCountText">0 photos</span>
+        <span id="reviewedCountText">0 reviewed</span>
+      </div>
+    </aside>
+
+    <main id="chatMainView" class="main-panel">
+      <div id="threadHeader" class="thread-head">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button id="backToQuestionsBtn" class="btn hidden"><i class="fa-solid fa-arrow-left"></i> Back</button>
+          <div id="activeAvatar" class="thread-avatar">?</div>
+          <div>
+            <h3 id="activeStudentName" class="thread-name">Select a student</h3>
+            <p id="activeStudentSubtitle" class="thread-sub">Pick anyone from the roster to see their submission</p>
+          </div>
+        </div>
+        <div id="threadHeaderActions" class="hidden">
+          <button id="toggleReviewedBtn" class="btn"><i class="fa-regular fa-circle-check" id="reviewedBtnIcon"></i> <span id="reviewedBtnText">Mark reviewed</span></button>
+        </div>
+      </div>
+
+      <div id="messageStream" class="stream">
+        <div id="emptyThreadPrompt" class="empty-state">
+          <div class="empty-icon"><i class="fa-solid fa-message-dots"></i></div>
+          <div>
+            <h3 class="font-display" style="font-size:16px;font-weight:600;">No student selected</h3>
+            <p style="font-size:12px;color:var(--ink-soft);max-width:320px;margin-top:5px;">Pick a name from the roster on the left to read their submission.</p>
+          </div>
+        </div>
+
+        <div id="activeThreadContent" class="thread-content hidden">
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div id="msgAvatar" class="roster-avatar" style="width:34px;height:34px;flex-shrink:0;">ST</div>
+            <div style="flex-grow:1;display:flex;flex-direction:column;gap:10px;">
+              <div class="submission-card card">
+                <div class="submission-card-head">
+                  <span id="msgStudentName" style="font-weight:700;">Student</span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span id="msgHomeworkBadge" class="tag-chip">Homework</span>
+                    <span id="msgDateBadge" class="font-mono" style="font-size:10.5px;color:var(--ink-soft);"></span>
+                  </div>
+                </div>
+                <div id="msgTextContent" class="submission-text"></div>
+              </div>
+
+              <div class="media-section-head">
+                <span class="media-section-title"><i class="fa-solid fa-images" style="color:var(--gold);"></i> Submitted work</span>
+                <span id="attachedCountBadge" class="font-mono" style="font-size:10.5px;color:var(--ink-soft);">0 attached</span>
+              </div>
+              <div id="mediaGrid" class="media-grid"></div>
+            </div>
+          </div>
+
+          <div class="grading-box">
+            <div class="grading-inner">
+              <div class="grading-head"><span><i class="fa-solid fa-stamp"></i> Grade & notes</span><span style="font-weight:500;color:var(--ink-soft);">saved locally</span></div>
+              <div class="grading-grid">
+                <div><label class="field-mini-label">Grade</label><input type="text" id="gradeInput" class="text-input" placeholder="A, 95%…"></div>
+                <div><label class="field-mini-label">Notes</label><input type="text" id="feedbackInput" class="text-input" placeholder="Quick feedback…"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <main id="galleryMainView" class="main-panel hidden">
+      <div class="view-toolbar">
+        <div><div class="view-toolbar-title"><i class="fa-solid fa-grip" style="color:var(--gold);"></i> Gallery</div><div class="view-toolbar-sub">Every submission's first photo, at a glance.</div></div>
+        <span id="galleryCountBadge" class="count-chip">0 cards</span>
+      </div>
+      <div class="view-scroll"><div id="galleryGridContainer" class="gallery-grid"></div></div>
+    </main>
+
+    <main id="questionsMainView" class="main-panel hidden">
+      <div class="view-toolbar">
+        <div><div class="view-toolbar-title"><i class="fa-solid fa-list-check" style="color:var(--gold);"></i> All responses</div><div class="view-toolbar-sub">Every question and response text in one scroll.</div></div>
+        <span id="questionsCountBadge" class="count-chip">0 total</span>
+      </div>
+      <div class="view-scroll"><div id="questionsCardsContainer"></div></div>
+    </main>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightboxModal" class="lightbox-overlay hidden">
+  <div class="lightbox-head">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span id="lightboxStudentTitle" style="font-size:13px;font-weight:700;"></span>
+      <span id="lightboxFormatBadge" class="font-mono" style="font-size:10px;background:#33301c;color:#dcae54;padding:2px 8px;border-radius:20px;"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <button id="resetPanZoomBtn" class="lb-btn"><i class="fa-solid fa-arrows-to-dot"></i> Reset</button>
+      <button id="zoomOutBtn" class="lb-btn lb-btn-icon"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+      <button id="zoomInBtn" class="lb-btn lb-btn-icon"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+      <button id="rotateBtn" class="lb-btn lb-btn-icon"><i class="fa-solid fa-rotate-right"></i></button>
+      <a id="downloadImageBtn" href="#" download target="_blank" class="lb-btn lb-btn-icon" style="background:var(--gold);border-color:var(--gold);color:#1c160c;"><i class="fa-solid fa-download"></i></a>
+      <button id="closeLightboxBtn" class="lb-btn lb-btn-icon"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  </div>
+  <div id="lightboxStage" class="lightbox-stage"><img id="lightboxImg" src="" alt=""></div>
+  <div class="lightbox-foot">
+    <span id="lightboxMetaText">Image 1 of 1</span>
+    <div style="display:flex;gap:8px;">
+      <button id="prevImgBtn" class="lb-btn"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+      <button id="nextImgBtn" class="lb-btn">Next <i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+  </div>
+</div>
+
+<div id="toastStack"></div>
+
+<!-- MODULES:START -->
+<!-- MODULE: Main Plugin (v1) -->
+<script>
+/* ============================================================
+   MAIN PLUGIN -- RC namespace, shared state, DOM refs, filtering
+   Every feature block attaches its public functions to RC.<Feature>.
+   ============================================================ */
+const RC = {};
+
+RC.state = {
+  students: [],
+  currentStudentId: null,
+  activeFilter: 'all',        // 'all' | 'hasImages' | 'reviewed'
+  activeHomework: 'all',
+  activeStartDate: '',
+  activeEndDate: '',
+  activeTab: 'chat',           // 'chat' | 'gallery' | 'questions'
+  cameFromOtherTab: false,
+  rawHeaders: [],
+  rawRows: [],
+};
+
+RC.dom = {};
+
+function rcQ(id) { return document.getElementById(id); }
+
+RC.cacheDom = function () {
+  const ids = [
+    'uploadView', 'dashboardView', 'chatMainView', 'galleryMainView', 'questionsMainView',
+    'googleSheetUrlInput', 'loadGoogleSheetBtn', 'trySampleLinkBtn',
+    'navTabs', 'tabChatBtn', 'tabGalleryBtn', 'tabQuestionsBtn', 'backToQuestionsBtn',
+    'questionsCardsContainer', 'questionsCountBadge', 'galleryGridContainer', 'galleryCountBadge',
+    'dropZone', 'fileInput', 'loadDemoBtn', 'quickDemoBtn', 'resetAppBtn',
+    'mappingModal', 'colNameSelect', 'colTextSelect', 'colUrlsSelect', 'colHomeworkSelect', 'colDateSelect',
+    'confirmMappingBtn', 'cancelMappingBtn',
+    'studentListContainer', 'searchInput', 'homeworkFilterSelect', 'startDateFilterInput', 'endDateFilterInput',
+    'rosterCountBadge', 'totalMediaCountText', 'reviewedCountText',
+    'filterAll', 'filterHasImages', 'filterReviewed',
+    'emptyThreadPrompt', 'activeThreadContent', 'activeAvatar', 'activeStudentName', 'activeStudentSubtitle',
+    'threadHeaderActions', 'toggleReviewedBtn', 'reviewedBtnIcon', 'reviewedBtnText',
+    'msgAvatar', 'msgStudentName', 'msgHomeworkBadge', 'msgDateBadge', 'msgTextContent',
+    'attachedCountBadge', 'mediaGrid', 'gradeInput', 'feedbackInput',
+    'lightboxModal', 'lightboxStage', 'lightboxImg', 'lightboxStudentTitle', 'lightboxFormatBadge',
+    'lightboxMetaText', 'downloadImageBtn', 'closeLightboxBtn', 'resetPanZoomBtn',
+    'zoomInBtn', 'zoomOutBtn', 'rotateBtn', 'prevImgBtn', 'nextImgBtn',
+    'themeToggleBtn', 'toastStack', 'rosterPanel',
+  ];
+  ids.forEach(id => { RC.dom[id] = rcQ(id); });
+};
+
+RC.getFilteredStudents = function () {
+  const s = RC.state;
+  const query = s.dom_query || (RC.dom.searchInput ? RC.dom.searchInput.value.toLowerCase().trim() : '');
+
+  return s.students.filter(student => {
+    const matchesQuery = student.name.toLowerCase().includes(query) ||
+      student.text.toLowerCase().includes(query) ||
+      student.homework.toLowerCase().includes(query);
+    if (!matchesQuery) return false;
+
+    if (s.activeHomework !== 'all' && student.homework !== s.activeHomework) return false;
+
+    const studentDate = RC.Dates.parse(student.date);
+    if (s.activeStartDate && studentDate) {
+      const start = new Date(s.activeStartDate);
+      start.setHours(0, 0, 0, 0);
+      if (studentDate < start) return false;
+    }
+    if (s.activeEndDate && studentDate) {
+      const end = new Date(s.activeEndDate);
+      end.setHours(23, 59, 59, 999);
+      if (studentDate > end) return false;
+    }
+
+    if (s.activeFilter === 'hasImages') return student.links.length > 0;
+    if (s.activeFilter === 'reviewed') return student.reviewed;
+    return true;
+  });
+};
+
+RC.getStudent = function (id) {
+  return RC.state.students.find(st => st.id === id);
+};
+</script>
+
+<!-- MODULE: Toast Notifications (v1) -->
+<script>
+/* ============================================================
+   MODULE: Toast Notifications
+   ============================================================ */
+RC.Toast = {};
+
+RC.Toast.show = function (message, type) {
+  type = type || 'info';
+  const stack = RC.dom.toastStack;
+  if (!stack) return;
+
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+
+  const icon = type === 'error' ? 'fa-circle-xmark'
+    : type === 'success' ? 'fa-circle-check'
+    : 'fa-circle-info';
+
+  toast.innerHTML = '<i class="fa-solid ' + icon + '"></i> <span></span>';
+  toast.querySelector('span').textContent = message;
+  stack.appendChild(toast);
+
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 250);
+  }, 3200);
+};
+</script>
+
+<!-- MODULE: Date Parsing (v1) -->
+<script>
+/* ============================================================
+   MODULE: Date Parsing
+   Handles Excel serial timestamps, DD/MM/YYYY, and ISO strings.
+   ============================================================ */
+RC.Dates = {};
+
+RC.Dates.parse = function (rawDateStr) {
+  if (!rawDateStr) return null;
+  const str = String(rawDateStr).trim();
+
+  // Excel serial timestamp (e.g. 46224.20679398148)
+  if (!isNaN(str) && parseFloat(str) > 30000 && parseFloat(str) < 60000) {
+    const serial = parseFloat(str);
+    const utcDays = Math.floor(serial - 25569);
+    const utcValue = utcDays * 86400;
+    const dateInfo = new Date(utcValue * 1000);
+
+    const fractionalDay = serial - Math.floor(serial) + 0.0000001;
+    let totalSeconds = Math.floor(86400 * fractionalDay);
+    const seconds = totalSeconds % 60;
+    totalSeconds = Math.floor(totalSeconds / 60);
+    const minutes = totalSeconds % 60;
+    const hours = Math.floor(totalSeconds / 60);
+
+    return new Date(dateInfo.getFullYear(), dateInfo.getMonth(), dateInfo.getDate(), hours, minutes, seconds);
+  }
+
+  // DD/MM/YYYY or DD/MM/YYYY HH:MM:SS
+  const dmyMatch = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
+    const hours = dmyMatch[4] ? parseInt(dmyMatch[4], 10) : 0;
+    const minutes = dmyMatch[5] ? parseInt(dmyMatch[5], 10) : 0;
+    const seconds = dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0;
+    return new Date(year, month, day, hours, minutes, seconds);
+  }
+
+  const standardDate = new Date(str);
+  return isNaN(standardDate.getTime()) ? null : standardDate;
+};
+
+RC.Dates.format = function (rawDateStr) {
+  const parsed = RC.Dates.parse(rawDateStr);
+  if (!parsed) return rawDateStr;
+
+  const dd = String(parsed.getDate()).padStart(2, '0');
+  const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+  const yyyy = parsed.getFullYear();
+  const hh = String(parsed.getHours()).padStart(2, '0');
+  const min = String(parsed.getMinutes()).padStart(2, '0');
+  const ss = String(parsed.getSeconds()).padStart(2, '0');
+
+  return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min + ':' + ss;
+};
+</script>
+
+<!-- MODULE: HEIC Conversion (v1) -->
+<script>
+/* ============================================================
+   MODULE: HEIC Conversion
+   Converts HEIC/HEIF student photos to viewable JPEGs client-side,
+   with a memory cache so each URL is only fetched/converted once.
+   ============================================================ */
+RC.Heic = {};
+
+RC.Heic._cache = new Map();
+RC.Heic._converting = new Set();
+RC.Heic.proxyPrefix = 'https://corsproxy.io/?';
+
+RC.Heic.isHeicUrl = function (url) {
+  if (!url) return false;
+  const cleanUrl = url.toLowerCase().split(/[?#]/)[0];
+  return cleanUrl.endsWith('.heic') || cleanUrl.endsWith('.heif');
+};
+
+RC.Heic.formatImageUrl = function (url) {
+  if (!url) return '';
+  const driveMatch = url.match(/\/file\/d\/([^\/]+)/) || url.match(/id=([^&]+)/);
+  if (driveMatch && driveMatch[1] && url.includes('drive.google.com')) {
+    return 'https://lh3.googleusercontent.com/d/' + driveMatch[1];
+  }
+  return url;
+};
+
+RC.Heic.fetchBlobWithFallback = async function (url) {
+  const directUrl = RC.Heic.formatImageUrl(url);
+  try {
+    const res = await fetch(directUrl, { mode: 'cors' });
+    if (res.ok) return await res.blob();
+  } catch (e) {}
+
+  try {
+    const proxyRes = await fetch(RC.Heic.proxyPrefix + encodeURIComponent(directUrl));
+    if (proxyRes.ok) return await proxyRes.blob();
+  } catch (e) {}
+
+  return null;
+};
+
+RC.Heic.getConvertedUrl = async function (url) {
+  if (RC.Heic._cache.has(url)) return await RC.Heic._cache.get(url);
+
+  const conversionPromise = (async () => {
+    const blob = await RC.Heic.fetchBlobWithFallback(url);
+    if (!blob) return url;
+
+    if (RC.Heic.isHeicUrl(url)) {
+      const converted = await heic2any({ blob: blob, toType: 'image/jpeg', quality: 0.65 });
+      const resBlob = Array.isArray(converted) ? converted[0] : converted;
+      return URL.createObjectURL(resBlob);
+    }
+    return URL.createObjectURL(blob);
+  })();
+
+  RC.Heic._cache.set(url, conversionPromise);
+  return await conversionPromise;
+};
+
+// Walks every student's links and pre-converts any HEIC photos in the
+// background, refreshing the roster ("converting…" chip) as it goes.
+RC.Heic.startBackgroundConversion = async function () {
+  for (const student of RC.state.students) {
+    const heicUrls = student.links.filter(RC.Heic.isHeicUrl);
+    if (heicUrls.length === 0) continue;
+
+    RC.Heic._converting.add(student.id);
+    RC.Roster.render();
+
+    for (const url of heicUrls) {
+      try { await RC.Heic.getConvertedUrl(url); }
+      catch (e) { console.warn('HEIC conversion failed:', e); }
+    }
+
+    RC.Heic._converting.delete(student.id);
+    RC.Roster.render();
+
+    if (RC.state.currentStudentId === student.id) RC.Chat.selectStudent(student.id);
+  }
+};
+</script>
+
+<!-- MODULE: DOM Helpers (v1) -->
+<script>
+/* ============================================================
+   MODULE: DOM Helpers
+   ============================================================ */
+RC.Dom = {};
+
+RC.Dom.escapeHtml = function (str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+RC.Dom.initials = function (name) {
+  return String(name).trim().substring(0, 2).toUpperCase();
+};
+</script>
+
+<!-- MODULE: Theme Toggle (v1) -->
+<script>
+/* ============================================================
+   FEATURE: Theme Toggle
+   ============================================================ */
+RC.Theme = {};
+
+RC.Theme.KEY = 'rollcall.theme';
+
+RC.Theme.init = function () {
+  const saved = localStorage.getItem(RC.Theme.KEY);
+  const preferred = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  RC.Theme.apply(preferred);
+
+  RC.dom.themeToggleBtn.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    RC.Theme.apply(current === 'dark' ? 'light' : 'dark');
+  });
+};
+
+RC.Theme.apply = function (mode) {
+  document.documentElement.setAttribute('data-theme', mode);
+  localStorage.setItem(RC.Theme.KEY, mode);
+  const icon = RC.dom.themeToggleBtn.querySelector('i');
+  icon.className = mode === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+};
+</script>
+
+<!-- MODULE: Data Import (v1) -->
+<script>
+/* ============================================================
+   FEATURE: Data Import
+   Google Sheets fetch (JSONP + proxy fallback), Excel/CSV parsing,
+   column mapping modal, and demo data.
+   ============================================================ */
+RC.Import = {};
+
+RC.Import.init = function () {
+  const d = RC.dom;
+
+  d.dropZone.addEventListener('click', () => d.fileInput.click());
+  ['dragenter', 'dragover'].forEach(evt => {
+    d.dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); d.dropZone.classList.add('drag-active'); });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    d.dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); d.dropZone.classList.remove('drag-active'); });
+  });
+  d.dropZone.addEventListener('drop', e => {
+    const dt = e.dataTransfer;
+    if (dt.files && dt.files.length > 0) RC.Import.handleSpreadsheetFile(dt.files[0]);
+  });
+  d.fileInput.addEventListener('change', e => {
+    if (e.target.files && e.target.files.length > 0) RC.Import.handleSpreadsheetFile(e.target.files[0]);
+  });
+
+  d.loadGoogleSheetBtn.addEventListener('click', RC.Import.handleGoogleSheetLink);
+  d.googleSheetUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') RC.Import.handleGoogleSheetLink(); });
+  d.trySampleLinkBtn.addEventListener('click', () => {
+    d.googleSheetUrlInput.value = 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#gid=0';
+  });
+
+  d.loadDemoBtn.addEventListener('click', RC.Import.loadDemoData);
+  d.quickDemoBtn.addEventListener('click', RC.Import.loadDemoData);
+  d.resetAppBtn.addEventListener('click', () => location.reload());
+  d.cancelMappingBtn.addEventListener('click', () => d.mappingModal.classList.add('hidden'));
+  d.confirmMappingBtn.addEventListener('click', RC.Import.confirmMapping);
+};
+
+/* ---------- Google Sheets ---------- */
+
+RC.Import.extractSheetIdAndGid = function (urlStr) {
+  try {
+    const idMatch = urlStr.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (!idMatch) return null;
+    const gidMatch = urlStr.match(/gid=([0-9]+)/);
+    return { spreadsheetId: idMatch[1], gid: gidMatch ? gidMatch[1] : '0' };
+  } catch (e) { return null; }
+};
+
+RC.Import.fetchGoogleSheetViaScript = function (spreadsheetId, gid) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'gviz_cb_' + Math.floor(Math.random() * 1000000);
+    const script = document.createElement('script');
+    const timeout = setTimeout(() => { cleanup(); reject(new Error('JSONP timeout')); }, 8000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      if (script.parentNode) script.parentNode.removeChild(script);
+      delete window[callbackName];
+    }
+
+    window[callbackName] = function (gvizData) {
+      cleanup();
+      if (gvizData && gvizData.status === 'ok') {
+        const parsed = RC.Import.parseGvizPayload(gvizData);
+        if (parsed && parsed.rows.length > 0) resolve(parsed);
+        else reject(new Error('Sheet returned no rows'));
+      } else {
+        reject(new Error('GViz access denied or invalid sheet'));
+      }
+    };
+
+    script.src = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/gviz/tq?tqx=responseHandler:' + callbackName + '&gid=' + gid;
+    script.onerror = function () { cleanup(); reject(new Error('Script load failed')); };
+    document.head.appendChild(script);
+  });
+};
+
+RC.Import.parseGvizPayload = function (gvizData) {
+  if (!gvizData || !gvizData.table) return null;
+  const table = gvizData.table;
+  let headers = table.cols.map(col => (col && col.label && col.label.trim()) ? col.label.trim() : '');
+
+  const rawRows = [];
+  if (table.rows) {
+    table.rows.forEach(r => {
+      if (!r || !r.c) return;
+      const rowArr = [];
+      r.c.forEach((cell, idx) => {
+        let val = '';
+        if (cell !== null && cell !== undefined) {
+          if (cell.f) {
+            val = cell.f;
+          } else if (cell.v !== null && cell.v !== undefined) {
+            val = cell.v;
+            if (typeof val === 'string' && val.startsWith('Date(')) {
+              const parts = val.match(/\d+/g);
+              if (parts && parts.length >= 3) {
+                const dateObj = new Date(parts[0], parts[1], parts[2], parts[3] || 0, parts[4] || 0, parts[5] || 0);
+                val = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              }
+            }
+          }
+        }
+        rowArr[idx] = String(val).trim();
+      });
+      rawRows.push(rowArr);
+    });
+  }
+
+  const hasValidHeaders = headers.some(h => h !== '');
+  if (!hasValidHeaders && rawRows.length > 0) {
+    headers = rawRows[0].map((val, idx) => val || ('Column_' + (idx + 1)));
+    rawRows.shift();
+  } else {
+    headers = headers.map((h, idx) => h || ('Column_' + (idx + 1)));
+  }
+
+  const rows = rawRows.map(rowArr => {
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = rowArr[idx] !== undefined ? rowArr[idx] : ''; });
+    return obj;
+  });
+
+  return { headers, rows };
+};
+
+RC.Import.handleGoogleSheetLink = async function () {
+  const d = RC.dom;
+  const rawUrl = d.googleSheetUrlInput.value.trim();
+  if (!rawUrl) { RC.Toast.show('Please enter a Google Sheets URL.', 'error'); return; }
+
+  const extracted = RC.Import.extractSheetIdAndGid(rawUrl);
+  if (!extracted) { RC.Toast.show('Invalid Google Sheets URL format.', 'error'); return; }
+
+  d.loadGoogleSheetBtn.disabled = true;
+  d.loadGoogleSheetBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading…';
+  RC.Toast.show('Fetching Google Sheet data…', 'info');
+
+  try {
+    const jsonpResult = await RC.Import.fetchGoogleSheetViaScript(extracted.spreadsheetId, extracted.gid);
+    if (jsonpResult && jsonpResult.rows && jsonpResult.rows.length > 0) {
+      RC.state.rawHeaders = jsonpResult.headers;
+      RC.state.rawRows = jsonpResult.rows;
+      RC.Import.populateColumnSelects();
+      d.mappingModal.classList.remove('hidden');
+      RC.Toast.show('Fetched ' + RC.state.rawRows.length + ' rows.', 'success');
+      d.loadGoogleSheetBtn.disabled = false;
+      d.loadGoogleSheetBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Load';
+      return;
+    }
+  } catch (err) {
+    console.warn('JSONP fetch failed, trying proxies…', err);
+  }
+
+  const exportUrl = 'https://docs.google.com/spreadsheets/d/' + extracted.spreadsheetId + '/export?format=csv&gid=' + extracted.gid;
+  const endpoints = [
+    exportUrl,
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(exportUrl),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(exportUrl),
+    RC.Heic.proxyPrefix + encodeURIComponent(exportUrl),
+  ];
+
+  let fetchedText = null;
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint);
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.trim().length > 0 && !text.trim().toLowerCase().startsWith('<!doctype')) {
+          fetchedText = text;
+          break;
+        }
+      }
+    } catch (e) {}
+  }
+
+  d.loadGoogleSheetBtn.disabled = false;
+  d.loadGoogleSheetBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> Load';
+
+  if (!fetchedText) {
+    RC.Toast.show('Could not fetch the sheet. Check that sharing is "Anyone with the link can view".', 'error');
+    return;
+  }
+
+  try {
+    const workbook = XLSX.read(fetchedText, { type: 'string' });
+    RC.Import.processWorkbook(workbook);
+  } catch (err) {
+    RC.Toast.show('Failed to parse sheet data: ' + err.message, 'error');
+  }
+};
+
+/* ---------- File upload ---------- */
+
+RC.Import.handleSpreadsheetFile = function (file) {
+  if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
+    RC.Toast.show('Please upload a valid .xlsx, .xls, or .csv file.', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      RC.Import.processWorkbook(workbook);
+    } catch (err) {
+      RC.Toast.show('Error parsing file: ' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+RC.Import.processWorkbook = function (workbook) {
+  if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+    RC.Toast.show('Spreadsheet contains no readable sheets.', 'error'); return;
+  }
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!worksheet) { RC.Toast.show('First sheet appears empty.', 'error'); return; }
+
+  const jsonRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+  if (!jsonRows || jsonRows.length < 2 || !Array.isArray(jsonRows[0])) {
+    RC.Toast.show('Spreadsheet is empty or has no header row.', 'error'); return;
+  }
+
+  RC.state.rawHeaders = jsonRows[0].map(h => String(h).trim()).filter(Boolean);
+  if (RC.state.rawHeaders.length === 0) { RC.Toast.show('No column headers found.', 'error'); return; }
+
+  const dataRows = jsonRows.slice(1).filter(row => Array.isArray(row) && row.some(cell => String(cell).trim() !== ''));
+  RC.state.rawRows = dataRows.map(row => {
+    const obj = {};
+    RC.state.rawHeaders.forEach((h, idx) => { obj[h] = row[idx] !== undefined ? row[idx] : ''; });
+    return obj;
+  });
+
+  RC.Import.populateColumnSelects();
+  RC.dom.mappingModal.classList.remove('hidden');
+};
+
+/* ---------- Column mapping ---------- */
+
+RC.Import.populateColumnSelects = function () {
+  const d = RC.dom;
+  d.colNameSelect.innerHTML = '';
+  d.colTextSelect.innerHTML = '<option value="">None</option>';
+  d.colUrlsSelect.innerHTML = '';
+  d.colHomeworkSelect.innerHTML = '<option value="">None</option>';
+  d.colDateSelect.innerHTML = '<option value="">None</option>';
+
+  let defaultName = '', defaultText = '', defaultUrls = '', defaultHomework = '', defaultDate = '';
+
+  RC.state.rawHeaders.forEach(h => {
+    const hLower = h.toLowerCase().trim();
+    if (hLower.includes('subir tarea') || hLower.includes('subir_tarea') || hLower === 'subir') defaultUrls = h;
+    if (hLower.includes('submitted at') || hLower.includes('submitted_at') || hLower === 'submitted') defaultDate = h;
+  });
+
+  RC.state.rawHeaders.forEach(h => {
+    const hLower = h.toLowerCase().trim();
+    if (!defaultName && (hLower.includes('name') || hLower.includes('student') || hLower.includes('nombre') || hLower.includes('alumno') || hLower.includes('estudiante'))) defaultName = h;
+    if (!defaultText && (hLower.includes('retroalimentacion') || hLower.includes('retroalimentación') || hLower.includes('pregunta') || hLower.includes('feedback') || hLower.includes('comentario') || hLower.includes('text') || hLower.includes('message') || hLower.includes('respuesta'))) defaultText = h;
+    if (!defaultUrls && (hLower.includes('tarea') || hLower.includes('url') || hLower.includes('link') || hLower.includes('file') || hLower.includes('image') || hLower.includes('photo') || hLower.includes('adjunto'))) defaultUrls = h;
+    if (!defaultHomework && !hLower.includes('subir') && (hLower.includes('homework') || hLower.includes('entrega') || hLower.includes('actividad') || hLower.includes('clase') || hLower.includes('selecciona') || hLower.includes('tarea'))) defaultHomework = h;
+    if (!defaultDate && (hLower.includes('submitted') || hLower.includes('timestamp') || hLower.includes('fecha') || hLower.includes('date') || hLower.includes('marca temporal'))) defaultDate = h;
+
+    d.colNameSelect.add(new Option(h, h));
+    d.colTextSelect.add(new Option(h, h));
+    d.colUrlsSelect.add(new Option(h, h));
+    d.colHomeworkSelect.add(new Option(h, h));
+    d.colDateSelect.add(new Option(h, h));
+  });
+
+  if (defaultName) d.colNameSelect.value = defaultName;
+  if (defaultText) d.colTextSelect.value = defaultText;
+  if (defaultUrls) d.colUrlsSelect.value = defaultUrls;
+  if (defaultHomework) d.colHomeworkSelect.value = defaultHomework;
+  if (defaultDate) d.colDateSelect.value = defaultDate;
+};
+
+RC.Import.confirmMapping = function () {
+  const d = RC.dom;
+  const nameCol = d.colNameSelect.value, textCol = d.colTextSelect.value, urlsCol = d.colUrlsSelect.value,
+    homeworkCol = d.colHomeworkSelect.value, dateCol = d.colDateSelect.value;
+
+  if (!nameCol || !urlsCol) { RC.Toast.show('Please map a Student Name and Image URLs column.', 'error'); return; }
+
+  RC.state.students = RC.state.rawRows.map((row, idx) => {
+    const studentName = String(row[nameCol] || '').trim() || ('Student #' + (idx + 1));
+    const studentText = textCol ? String(row[textCol] || '').trim() : '';
+    const homeworkTask = homeworkCol ? String(row[homeworkCol] || '').trim() : 'General';
+    const rawDate = dateCol ? String(row[dateCol] || '').trim() : '';
+    const formattedDate = RC.Dates.format(rawDate);
+    const rawUrls = String(row[urlsCol] || '').trim();
+
+    const links = rawUrls.split(/[\n,\s]+/)
+      .map(u => u.trim())
+      .filter(u => u.startsWith('http://') || u.startsWith('https://'))
+      .map(RC.Heic.formatImageUrl);
+
+    return {
+      id: idx, name: studentName,
+      text: studentText || 'No response text submitted.',
+      homework: homeworkTask || 'Homework 1',
+      date: formattedDate || new Date().toLocaleDateString(),
+      links: links, reviewed: false, grade: '', feedback: '',
+    };
+  });
+
+  RC.Roster.populateHomeworkFilter();
+  d.mappingModal.classList.add('hidden');
+  RC.Import.launchDashboard();
+  RC.Heic.startBackgroundConversion();
+  RC.Toast.show('Loaded ' + RC.state.students.length + ' submissions.', 'success');
+};
+
+RC.Import.launchDashboard = function () {
+  const d = RC.dom;
+  d.uploadView.classList.add('hidden');
+  d.dashboardView.classList.remove('hidden');
+  d.resetAppBtn.classList.remove('hidden');
+  d.navTabs.classList.remove('hidden');
+  RC.Roster.render();
+  if (RC.state.students.length > 0) RC.Chat.selectStudent(RC.state.students[0].id);
+};
+
+/* ---------- Demo data ---------- */
+
+RC.Import.loadDemoData = function () {
+  RC.state.students = [
+    { id: 0, name: 'Sofia Martinez', text: '¿Cómo puedo mejorar la profundidad de sombras en el primer plano? Presento mi estudio de paisaje acrílico.', homework: 'Task 1: Sketch', date: '20/07/2026 01:41:52',
+      links: ['https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&auto=format&fit=crop', 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop'],
+      reviewed: false, grade: 'A', feedback: 'Outstanding highlight work on the horizon.' },
+    { id: 1, name: 'Lucas Chen', text: 'Retroalimentación sobre el concepto de personaje digital. ¿Las proporciones del boceto funcionan bien?', homework: 'Task 2: Color', date: '21/07/2026 14:22:10',
+      links: ['https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800&auto=format&fit=crop'],
+      reviewed: true, grade: 'A-', feedback: 'Great line weight and proportion.' },
+    { id: 2, name: 'Emma Watson', text: 'Adjunto fotos de mi escultura de arcilla realizada en la sesión de taller.', homework: 'Task 1: Sketch', date: '22/07/2026 09:15:00',
+      links: ['https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800&auto=format&fit=crop', 'https://images.unsplash.com/photo-1578926375605-eaf7559b1458?w=800&auto=format&fit=crop'],
+      reviewed: false, grade: '', feedback: '' },
+    { id: 3, name: 'Mateo Garcia', text: 'Pregunta sobre el Capítulo 4: ¿Debería profundizar más en el análisis histórico de la entrega?', homework: 'Task 3: Final', date: '22/07/2026 11:30:45',
+      links: [], reviewed: false, grade: '', feedback: '' },
+  ];
+
+  RC.Roster.populateHomeworkFilter();
+  RC.Import.launchDashboard();
+  RC.Toast.show('Loaded the interactive demo class.', 'success');
+};
+</script>
+
+<!-- MODULE: Roster & Filters (v1) -->
+<script>
+/* ============================================================
+   FEATURE: Roster & Filters
+   ============================================================ */
+RC.Roster = {};
+
+RC.Roster.init = function () {
+  const d = RC.dom;
+
+  d.filterAll.addEventListener('click', () => RC.Roster.setFilter('all'));
+  d.filterHasImages.addEventListener('click', () => RC.Roster.setFilter('hasImages'));
+  d.filterReviewed.addEventListener('click', () => RC.Roster.setFilter('reviewed'));
+
+  d.homeworkFilterSelect.addEventListener('change', e => { RC.state.activeHomework = e.target.value; RC.Roster.onFilterChanged(); });
+  d.startDateFilterInput.addEventListener('change', e => { RC.state.activeStartDate = e.target.value; RC.Roster.onFilterChanged(); });
+  d.endDateFilterInput.addEventListener('change', e => { RC.state.activeEndDate = e.target.value; RC.Roster.onFilterChanged(); });
+  d.searchInput.addEventListener('input', () => RC.Roster.onFilterChanged());
+};
+
+RC.Roster.onFilterChanged = function () {
+  RC.Roster.render();
+  if (RC.state.activeTab === 'gallery') RC.Gallery.render();
+  if (RC.state.activeTab === 'questions') RC.Questions.render();
+};
+
+RC.Roster.setFilter = function (filter) {
+  RC.state.activeFilter = filter;
+  const d = RC.dom;
+  [d.filterAll, d.filterHasImages, d.filterReviewed].forEach(b => b.classList.remove('active'));
+  if (filter === 'all') d.filterAll.classList.add('active');
+  if (filter === 'hasImages') d.filterHasImages.classList.add('active');
+  if (filter === 'reviewed') d.filterReviewed.classList.add('active');
+  RC.Roster.render();
+};
+
+RC.Roster.populateHomeworkFilter = function () {
+  const sel = RC.dom.homeworkFilterSelect;
+  sel.innerHTML = '<option value="all">All homeworks</option>';
+  const unique = [...new Set(RC.state.students.map(s => s.homework))].filter(Boolean);
+  unique.forEach(hw => sel.add(new Option(hw, hw)));
+};
+
+RC.Roster.render = function () {
+  const d = RC.dom;
+  const container = d.studentListContainer;
+  container.innerHTML = '';
+  const filtered = RC.getFilteredStudents();
+
+  d.rosterCountBadge.textContent = filtered.length + ' student' + (filtered.length === 1 ? '' : 's');
+
+  let totalPhotos = 0, reviewedCount = 0;
+  RC.state.students.forEach(s => { totalPhotos += s.links.length; if (s.reviewed) reviewedCount++; });
+  d.totalMediaCountText.textContent = totalPhotos + ' photos';
+  d.reviewedCountText.textContent = reviewedCount + ' reviewed';
+
+  filtered.forEach(student => {
+    const isSelected = student.id === RC.state.currentStudentId;
+    const isConverting = RC.Heic._converting.has(student.id);
+    const initials = RC.Dom.initials(student.name);
+
+    const btn = document.createElement('button');
+    btn.className = 'roster-row' + (isSelected ? ' selected' : '');
+    btn.onclick = () => {
+      RC.state.cameFromOtherTab = false;
+      RC.dom.backToQuestionsBtn.classList.add('hidden');
+      RC.Chat.selectStudent(student.id);
+    };
+
+    btn.innerHTML =
+      '<span class="punch-hole"></span>' +
+      '<span class="roster-avatar' + (student.reviewed ? ' reviewed' : '') + '">' + (student.reviewed ? '<i class="fa-solid fa-check"></i>' : initials) + '</span>' +
+      '<span class="roster-info">' +
+        '<span class="roster-name-row">' +
+          '<span class="roster-name"></span>' +
+          (isConverting ? '<span class="converting-chip">converting</span>' : '') +
+        '</span>' +
+        '<span class="roster-meta">' +
+          '<span class="tag-chip"></span>' +
+          '<span class="roster-date"></span>' +
+        '</span>' +
+      '</span>' +
+      (student.links.length > 0 ? '<span class="attach-chip"><i class="fa-solid fa-paperclip"></i> ' + student.links.length + '</span>' : '');
+
+    btn.querySelector('.roster-name').textContent = student.name;
+    btn.querySelector('.tag-chip').textContent = student.homework;
+    btn.querySelector('.roster-date').textContent = student.date;
+
+    container.appendChild(btn);
+  });
+};
+</script>
+
+<!-- MODULE: Grading & Feedback (v1) -->
+<script>
+/* ============================================================
+   FEATURE: Grading & Feedback
+   Binds the grade/notes inputs and the reviewed toggle to whichever
+   student is currently open in the thread.
+   ============================================================ */
+RC.Grading = {};
+
+RC.Grading.updateReviewedBtnUI = function (isReviewed) {
+  const d = RC.dom;
+  if (isReviewed) {
+    d.reviewedBtnIcon.className = 'fa-solid fa-circle-check';
+    d.reviewedBtnText.textContent = 'Reviewed';
+  } else {
+    d.reviewedBtnIcon.className = 'fa-regular fa-circle-check';
+    d.reviewedBtnText.textContent = 'Mark reviewed';
+  }
+};
+
+RC.Grading.bindToStudent = function (student) {
+  const d = RC.dom;
+  d.gradeInput.value = student.grade || '';
+  d.feedbackInput.value = student.feedback || '';
+  RC.Grading.updateReviewedBtnUI(student.reviewed);
+
+  d.gradeInput.oninput = e => { student.grade = e.target.value; };
+  d.feedbackInput.oninput = e => { student.feedback = e.target.value; };
+
+  d.toggleReviewedBtn.onclick = () => {
+    student.reviewed = !student.reviewed;
+    RC.Grading.updateReviewedBtnUI(student.reviewed);
+    RC.Roster.render();
+    RC.Toast.show(student.reviewed ? 'Marked as reviewed.' : 'Marked as unreviewed.', 'info');
+  };
+};
+</script>
+
+<!-- MODULE: Chat View (v1) -->
+<script>
+/* ============================================================
+   FEATURE: Chat View
+   Thread panel for the currently selected student, plus the tab
+   switcher shared by all three main views.
+   ============================================================ */
+RC.Chat = {};
+
+RC.Chat.init = function () {
+  const d = RC.dom;
+  d.tabChatBtn.addEventListener('click', () => RC.Chat.switchTab('chat'));
+  d.tabGalleryBtn.addEventListener('click', () => RC.Chat.switchTab('gallery'));
+  d.tabQuestionsBtn.addEventListener('click', () => RC.Chat.switchTab('questions'));
+  d.backToQuestionsBtn.addEventListener('click', () => RC.Chat.switchTab(RC.state.activeTab === 'gallery' ? 'gallery' : 'questions'));
+};
+
+RC.Chat.switchTab = function (tab) {
+  const d = RC.state;
+  d.activeTab = tab;
+  const dom = RC.dom;
+  [dom.chatMainView, dom.galleryMainView, dom.questionsMainView].forEach(v => v.classList.add('hidden'));
+  [dom.tabChatBtn, dom.tabGalleryBtn, dom.tabQuestionsBtn].forEach(b => b.classList.remove('active'));
+
+  if (tab === 'chat') {
+    dom.chatMainView.classList.remove('hidden');
+    dom.tabChatBtn.classList.add('active');
+    dom.backToQuestionsBtn.classList.toggle('hidden', !RC.state.cameFromOtherTab);
+  } else if (tab === 'gallery') {
+    dom.galleryMainView.classList.remove('hidden');
+    dom.tabGalleryBtn.classList.add('active');
+    RC.Gallery.render();
+  } else {
+    dom.questionsMainView.classList.remove('hidden');
+    dom.tabQuestionsBtn.classList.add('active');
+    RC.Questions.render();
+  }
+};
+
+RC.Chat.selectStudent = function (studentId) {
+  RC.state.currentStudentId = studentId;
+  const student = RC.getStudent(studentId);
+  if (!student) return;
+
+  RC.Roster.render();
+
+  const d = RC.dom;
+  d.emptyThreadPrompt.classList.add('hidden');
+  d.activeThreadContent.classList.remove('hidden');
+  d.threadHeaderActions.classList.remove('hidden');
+
+  const initials = RC.Dom.initials(student.name);
+  d.activeAvatar.textContent = initials;
+  d.activeStudentName.innerHTML = RC.Dom.escapeHtml(student.name) +
+    (student.reviewed ? ' <span class="stamp-chip reviewed"><i class="fa-solid fa-check"></i> reviewed</span>' : '');
+  d.activeStudentSubtitle.textContent = student.homework + ' • Submitted ' + student.date;
+
+  d.msgAvatar.textContent = initials;
+  d.msgStudentName.textContent = student.name;
+  d.msgHomeworkBadge.textContent = student.homework;
+  d.msgDateBadge.textContent = student.date;
+  d.msgTextContent.textContent = student.text;
+  d.attachedCountBadge.textContent = student.links.length + ' attached';
+
+  RC.Grading.bindToStudent(student);
+
+  RC.Chat.renderMediaGrid(student);
+};
+
+RC.Chat.renderMediaGrid = function (student) {
+  const grid = RC.dom.mediaGrid;
+  grid.innerHTML = '';
+
+  if (student.links.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;padding:16px;text-align:center;font-size:11.5px;color:var(--ink-faint);background:var(--surface-2);border:1px solid var(--rule);border-radius:14px;"><i class="fa-solid fa-image-slash"></i> No images submitted.</div>';
+    return;
+  }
+
+  student.links.forEach((url, idx) => {
+    const tile = document.createElement('div');
+    tile.className = 'media-tile';
+    tile.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--gold);font-size:18px;"></i>';
+    grid.appendChild(tile);
+
+    RC.Heic.getConvertedUrl(url).then(renderUrl => {
+      RC.Chat.paintMediaTile(tile, renderUrl, student, idx, url);
+    }).catch(() => {
+      RC.Chat.paintMediaTile(tile, url, student, idx, url);
+    });
+  });
+};
+
+RC.Chat.paintMediaTile = function (tile, renderUrl, student, idx, originalUrl) {
+  tile.innerHTML =
+    '<img src="' + renderUrl + '" onerror="this.onerror=null;this.src=\'https://placehold.co/400x400/ece4d1/6b6152?text=Load+Error\';">' +
+    '<div class="hover-veil"><span class="veil-label"><i class="fa-solid fa-magnifying-glass-plus"></i> Inspect</span></div>';
+  tile.onclick = () => RC.Lightbox.open(idx, student.name, RC.Heic.isHeicUrl(originalUrl), student.links);
+};
+</script>
+
+<!-- MODULE: Gallery View (v1) -->
+<script>
+/* ============================================================
+   FEATURE: Gallery View
+   ============================================================ */
+RC.Gallery = {};
+
+RC.Gallery.render = function () {
+  const d = RC.dom;
+  d.galleryGridContainer.innerHTML = '';
+  const filtered = RC.getFilteredStudents();
+  d.galleryCountBadge.textContent = filtered.length + ' card' + (filtered.length === 1 ? '' : 's');
+
+  if (filtered.length === 0) {
+    d.galleryGridContainer.innerHTML = '<div class="card" style="grid-column:1/-1;padding:26px;text-align:center;color:var(--ink-soft);font-size:12px;"><i class="fa-solid fa-images" style="font-size:26px;color:var(--ink-faint);display:block;margin-bottom:8px;"></i>No submissions match your filters.</div>';
+    return;
+  }
+
+  filtered.forEach(student => {
+    const previewImg = student.links.length > 0 ? student.links[0] : 'https://placehold.co/400x300/ece4d1/6b6152?text=No+Images';
+    const card = document.createElement('div');
+    card.className = 'gallery-card card';
+    card.innerHTML =
+      '<div class="gallery-thumb"><img src="' + previewImg + '" onerror="this.onerror=null;this.src=\'https://placehold.co/400x300/ece4d1/6b6152?text=No+Preview\';">' +
+        '<span class="gallery-count-badge">' + student.links.length + ' photos</span></div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+        '<h4 style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;"></h4>' +
+        '<span class="tag-chip"></span>' +
+      '</div>' +
+      '<p style="font-size:11px;color:var(--ink-soft);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;"></p>' +
+      '<div style="padding-top:8px;border-top:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;">' +
+        '<span class="font-mono" style="font-size:10px;color:var(--ink-faint);"></span>' +
+        '<button class="btn" style="font-size:10.5px;padding:5px 10px;">Go to thread <i class="fa-solid fa-arrow-right"></i></button>' +
+      '</div>';
+
+    card.querySelector('h4').textContent = student.name;
+    card.querySelector('.tag-chip').textContent = student.homework;
+    card.querySelector('p').textContent = student.text;
+    card.querySelectorAll('.font-mono')[0].textContent = student.date;
+    card.querySelector('button').onclick = () => RC.jumpToStudentChat(student.id);
+
+    d.galleryGridContainer.appendChild(card);
+  });
+};
+</script>
+
+<!-- MODULE: Questions View (v1) -->
+<script>
+/* ============================================================
+   FEATURE: Questions / All Responses View
+   ============================================================ */
+RC.Questions = {};
+
+RC.Questions.render = function () {
+  const d = RC.dom;
+  d.questionsCardsContainer.innerHTML = '';
+  const filtered = RC.getFilteredStudents();
+  d.questionsCountBadge.textContent = filtered.length + ' total';
+
+  if (filtered.length === 0) {
+    d.questionsCardsContainer.innerHTML = '<div class="card" style="padding:26px;text-align:center;color:var(--ink-soft);font-size:12px;"><i class="fa-solid fa-list-check" style="font-size:26px;color:var(--ink-faint);display:block;margin-bottom:8px;"></i>No responses match your filters.</div>';
+    return;
+  }
+
+  filtered.forEach(student => {
+    const initials = RC.Dom.initials(student.name);
+    const card = document.createElement('div');
+    card.className = 'qcard card';
+    card.innerHTML =
+      '<div class="qcard-head">' +
+        '<div style="display:flex;align-items:center;gap:11px;">' +
+          '<div class="roster-avatar' + (student.reviewed ? ' reviewed' : '') + '" style="width:36px;height:36px;">' + (student.reviewed ? '<i class="fa-solid fa-check"></i>' : initials) + '</div>' +
+          '<div>' +
+            '<h4 style="font-size:13.5px;font-weight:700;"></h4>' +
+            '<div style="display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--ink-soft);margin-top:2px;">' +
+              '<span class="tag-chip"></span><span class="hw-date"></span><span>' + student.links.length + ' photos</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<button class="btn btn-gold" style="font-size:11px;">Go to thread <i class="fa-solid fa-arrow-right"></i></button>' +
+      '</div>' +
+      '<div class="qcard-text"></div>';
+
+    card.querySelector('h4').textContent = student.name;
+    card.querySelector('.tag-chip').textContent = student.homework;
+    card.querySelector('.hw-date').textContent = student.date;
+    card.querySelector('.qcard-text').textContent = student.text;
+    card.querySelector('button').onclick = () => RC.jumpToStudentChat(student.id);
+
+    d.questionsCardsContainer.appendChild(card);
+  });
+};
+
+RC.jumpToStudentChat = function (studentId) {
+  RC.state.cameFromOtherTab = true;
+  RC.Chat.selectStudent(studentId);
+  RC.Chat.switchTab('chat');
+};
+</script>
+
+<!-- MODULE: Lightbox Viewer (v1) -->
+<script>
+/* ============================================================
+   FEATURE: Lightbox Viewer
+   Pan/zoom/rotate image inspector with prev/next navigation.
+   ============================================================ */
+RC.Lightbox = {};
+
+RC.Lightbox._links = [];
+RC.Lightbox._index = 0;
+RC.Lightbox._studentName = '';
+RC.Lightbox._scale = 1;
+RC.Lightbox._rotation = 0;
+RC.Lightbox._panX = 0;
+RC.Lightbox._panY = 0;
+RC.Lightbox._isPanning = false;
+RC.Lightbox._startPanX = 0;
+RC.Lightbox._startPanY = 0;
+
+RC.Lightbox.init = function () {
+  const d = RC.dom;
+
+  d.lightboxStage.addEventListener('mousedown', e => {
+    if (e.button === 0 || e.button === 1) {
+      e.preventDefault();
+      RC.Lightbox._isPanning = true;
+      RC.Lightbox._startPanX = e.clientX - RC.Lightbox._panX;
+      RC.Lightbox._startPanY = e.clientY - RC.Lightbox._panY;
+    }
+  });
+  window.addEventListener('mousemove', e => {
+    if (!RC.Lightbox._isPanning) return;
+    e.preventDefault();
+    RC.Lightbox._panX = e.clientX - RC.Lightbox._startPanX;
+    RC.Lightbox._panY = e.clientY - RC.Lightbox._startPanY;
+    RC.Lightbox.updateTransform();
+  });
+  window.addEventListener('mouseup', () => { RC.Lightbox._isPanning = false; });
+
+  d.lightboxStage.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+    RC.Lightbox._scale = Math.min(Math.max(0.3, RC.Lightbox._scale + delta), 6);
+    RC.Lightbox.updateTransform();
+  }, { passive: false });
+
+  d.resetPanZoomBtn.addEventListener('click', () => {
+    RC.Lightbox._scale = 1; RC.Lightbox._rotation = 0; RC.Lightbox._panX = 0; RC.Lightbox._panY = 0;
+    RC.Lightbox.updateTransform();
+  });
+  d.zoomInBtn.addEventListener('click', () => { RC.Lightbox._scale = Math.min(6, RC.Lightbox._scale + 0.3); RC.Lightbox.updateTransform(); });
+  d.zoomOutBtn.addEventListener('click', () => { RC.Lightbox._scale = Math.max(0.3, RC.Lightbox._scale - 0.3); RC.Lightbox.updateTransform(); });
+  d.rotateBtn.addEventListener('click', () => { RC.Lightbox._rotation = (RC.Lightbox._rotation + 90) % 360; RC.Lightbox.updateTransform(); });
+  d.closeLightboxBtn.addEventListener('click', () => d.lightboxModal.classList.add('hidden'));
+  d.prevImgBtn.addEventListener('click', () => { if (RC.Lightbox._index > 0) RC.Lightbox.open(RC.Lightbox._index - 1, RC.Lightbox._studentName, false, RC.Lightbox._links); });
+  d.nextImgBtn.addEventListener('click', () => { if (RC.Lightbox._index < RC.Lightbox._links.length - 1) RC.Lightbox.open(RC.Lightbox._index + 1, RC.Lightbox._studentName, false, RC.Lightbox._links); });
+};
+
+RC.Lightbox.updateTransform = function () {
+  RC.dom.lightboxImg.style.transform = 'translate(' + RC.Lightbox._panX + 'px, ' + RC.Lightbox._panY + 'px) scale(' + RC.Lightbox._scale + ') rotate(' + RC.Lightbox._rotation + 'deg)';
+};
+
+RC.Lightbox.open = function (idx, studentName, isHeic, links) {
+  const d = RC.dom;
+  RC.Lightbox._links = links;
+  RC.Lightbox._index = idx;
+  RC.Lightbox._studentName = studentName;
+  RC.Lightbox._scale = 1; RC.Lightbox._rotation = 0; RC.Lightbox._panX = 0; RC.Lightbox._panY = 0;
+
+  d.lightboxModal.classList.remove('hidden');
+  d.lightboxStudentTitle.textContent = studentName + ' — image ' + (idx + 1) + ' of ' + links.length;
+  d.lightboxFormatBadge.textContent = isHeic ? 'HEIC (decoded)' : 'Image';
+
+  RC.Lightbox.updateStage();
+};
+
+RC.Lightbox.updateStage = function () {
+  const d = RC.dom;
+  const url = RC.Lightbox._links[RC.Lightbox._index];
+  RC.Lightbox._panX = 0; RC.Lightbox._panY = 0;
+  RC.Lightbox.updateTransform();
+  d.lightboxMetaText.textContent = 'Image ' + (RC.Lightbox._index + 1) + ' of ' + RC.Lightbox._links.length;
+  d.downloadImageBtn.href = url;
+
+  d.lightboxImg.src = '';
+  RC.Heic.getConvertedUrl(url).then(renderUrl => { d.lightboxImg.src = renderUrl; }).catch(() => { d.lightboxImg.src = url; });
+};
+</script>
+
+<!-- MODULE: Engine (v1) -->
+<script>
+/* ============================================================
+   ENGINE -- boot sequence. Always runs last.
+   ============================================================ */
+function rcBoot() {
+  RC.cacheDom();
+  RC.Theme.init();
+  RC.Import.init();
+  RC.Roster.init();
+  RC.Chat.init();
+  RC.Lightbox.init();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', rcBoot);
+} else {
+  rcBoot();
+}
+</script>
+
+<!-- MODULE: Whiteboard (v6) -->
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     PLUGIN: Whiteboard v4
+     - Force-preloads every matching image before importing (with a
+       progress bar), so nothing gets skipped for not being "loaded"
+     - Generates small compressed thumbnails (canvas-based) for card
+       display; clicking a card opens the full-resolution original
+     - Two-line bar: student name on top, homework title below
+     - One consistent color per homework group on import (still
+       changeable per-card afterward via the color dot)
+     - Cards grouped by homework with a visual gap between groups
+     ============================================================ */
+
+  const STORAGE_KEY = 'rcWhiteboardState_v1';
+  const PALETTE = ['#a63d2f', '#9c6b1f', '#3f6b4a', '#2f5aa6', '#7a3fa6', '#c94f8e', '#4a4a4a'];
+  const THUMB_MAX_DIM = 220;
+  const THUMB_QUALITY = 0.55;
+  const IMPORT_CONCURRENCY = 5;
+
+  RC.Whiteboard = {};
+  const WB = RC.Whiteboard;
+
+  WB.state = {
+    zoom: 1,
+    panX: 40,
+    panY: 40,
+    tool: 'select',
+    color: PALETTE[0],
+    cards: [],
+    strokes: [],
+    selectedIds: [],
+  };
+
+  const El = {};
+  WB.el = El;
+  WB.PALETTE = PALETTE;
+  WB.defaultCardWidth = 130;
+  WB.defaultCardHeight = 150;
+  WB.compressorEnabled = true;
+  let zCounter = 10;
+  let drag = null;
+
+  /* ---------- persistence ---------- */
+  WB.save = function () {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        zoom: WB.state.zoom, panX: WB.state.panX, panY: WB.state.panY,
+        cards: WB.state.cards.map((c) => ({
+          id: c.id, studentId: c.studentId, studentName: c.studentName,
+          homeworkTitle: c.homeworkTitle, imageUrl: c.imageUrl, thumbUrl: c.thumbUrl,
+          x: c.x, y: c.y, width: c.width, height: c.height, barColor: c.barColor,
+        })),
+        strokes: WB.state.strokes,
+      }));
+    } catch (e) { /* storage unavailable or quota exceeded, ignore */ }
+  };
+
+  WB.load = function () {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.zoom) WB.state.zoom = data.zoom;
+      if (typeof data.panX === 'number') WB.state.panX = data.panX;
+      if (typeof data.panY === 'number') WB.state.panY = data.panY;
+      if (Array.isArray(data.cards)) WB.state.cards = data.cards;
+      if (Array.isArray(data.strokes)) WB.state.strokes = data.strokes;
+    } catch (e) { /* corrupt storage, ignore */ }
+  };
+
+  /* ---------- styles ---------- */
+  function injectStyles() {
+    const css = [
+      '.wb-toolbar { flex-wrap: wrap; gap: 10px; }',
+      '.wb-tool-group { display:flex; align-items:center; gap:4px; background:var(--surface-2); border:1px solid var(--rule); border-radius:10px; padding:3px; }',
+      '.wb-tool-btn { width:30px; height:30px; border-radius:8px; border:none; background:transparent; color:var(--ink-soft); display:flex; align-items:center; justify-content:center; }',
+      '.wb-tool-btn.active { background:var(--surface); color:var(--ink); box-shadow:0 1px 3px var(--shadow); }',
+      '.wb-tool-btn:hover { color:var(--ink); }',
+      '.wb-swatches { display:flex; align-items:center; gap:5px; }',
+      '.wb-swatch { width:18px; height:18px; border-radius:50%; border:2px solid var(--surface); box-shadow:0 0 0 1px var(--rule); cursor:pointer; flex-shrink:0; padding:0; }',
+      '.wb-swatch.active { box-shadow:0 0 0 2px var(--ink); }',
+      '.wb-custom-color { width:26px; height:26px; padding:0; border:1px solid var(--rule); border-radius:8px; background:none; cursor:pointer; }',
+      '.wb-viewport { flex-grow:1; position:relative; overflow:hidden; cursor:grab; background: radial-gradient(var(--rule) 1px, transparent 1px) 0 0 / 22px 22px, var(--surface-2); }',
+      '.wb-viewport.panning { cursor:grabbing; }',
+      '.wb-viewport.pen-mode, .wb-viewport.eraser-mode { cursor:crosshair; }',
+      '.wb-canvas { position:absolute; top:0; left:0; width:1px; height:1px; }',
+      '.wb-draw-layer { position:absolute; top:0; left:0; width:1px; height:1px; overflow:visible; pointer-events:none; z-index:5000; }',
+      '.wb-draw-layer path { pointer-events:none; fill:none; stroke-linecap:round; stroke-linejoin:round; }',
+      '.wb-draw-layer.eraser-active path { pointer-events:stroke; cursor:pointer; }',
+      '.wb-draw-layer.eraser-active path:hover { opacity:.4; }',
+      '.wb-card { position:absolute; display:flex; flex-direction:column; border-radius:10px; overflow:hidden; background:var(--surface); box-shadow:0 2px 8px -2px var(--shadow); border:2px solid transparent; user-select:none; cursor:pointer; }',
+      '.wb-card.selected { border-color:var(--gold); }',
+      '.wb-card-bar { position:relative; flex-shrink:0; display:flex; flex-direction:column; justify-content:center; gap:1px; padding:4px 20px 4px 6px; cursor:grab; color:#fff; }',
+      '.wb-card-bar:active { cursor:grabbing; }',
+      '.wb-card-bar-row { display:flex; align-items:center; gap:4px; min-width:0; }',
+      '.wb-card-name { font-size:10px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }',
+      '.wb-card-hw { font-size:8.5px; font-weight:500; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:14px; }',
+      '.wb-card-dot { width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,255,255,.8); flex-shrink:0; cursor:pointer; padding:0; background:none; }',
+      '.wb-card-close { position:absolute; top:4px; right:4px; background:none; border:none; color:#fff; opacity:.85; width:14px; height:14px; display:flex; align-items:center; justify-content:center; font-size:10px; }',
+      '.wb-card-close:hover { opacity:1; }',
+      '.wb-card-image { position:relative; flex-grow:1; background:var(--surface-2); overflow:hidden; }',
+      '.wb-card-image img { width:100%; height:100%; object-fit:contain; pointer-events:none; }',
+      '.wb-resize-handle { position:absolute; right:1px; bottom:1px; width:10px; height:10px; cursor:nwse-resize; border-right:2px solid var(--ink-faint); border-bottom:2px solid var(--ink-faint); opacity:.6; }',
+      '.wb-resize-handle:hover { opacity:1; }',
+      '.wb-palette-pop { position:absolute; top:34px; left:6px; z-index:6000; background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:6px; display:flex; gap:5px; box-shadow:0 6px 20px var(--shadow); }',
+      '.wb-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--ink-soft); font-size:12.5px; padding:20px; pointer-events:none; }',
+      '.wb-add-btn { position:absolute; top:3px; right:3px; z-index:6; width:22px; height:22px; border-radius:50%; border:none; background:var(--ink); color:var(--bg); display:flex; align-items:center; justify-content:center; font-size:9px; box-shadow:0 2px 6px var(--shadow); }',
+      '.wb-add-btn:hover { background:var(--gold); }',
+      '.wb-add-btn.wb-added { background:var(--stamp-green); }',
+      '.wb-modal-overlay { position:fixed; inset:0; z-index:100; background:var(--overlay); display:flex; align-items:center; justify-content:center; padding:16px; }',
+      '.wb-modal-box { width:100%; max-width:480px; background:var(--surface); border:1px solid var(--rule); border-radius:20px; padding:22px; display:flex; flex-direction:column; gap:16px; box-shadow:0 20px 60px var(--shadow); }',
+      '.wb-modal-title { font-family:\'Fraunces\',serif; font-weight:600; font-size:18px; color:var(--ink); }',
+      '.wb-modal-sub { font-size:11.5px; color:var(--ink-soft); }',
+      '.wb-filter-section { display:flex; flex-direction:column; gap:8px; }',
+      '.wb-filter-label { font-size:10.5px; font-weight:700; color:var(--ink); text-transform:uppercase; letter-spacing:.05em; }',
+      '.wb-date-inputs { display:grid; grid-template-columns:1fr 1fr; gap:10px; }',
+      '.wb-text-input { background:var(--bg); border:1px solid var(--rule); border-radius:10px; padding:8px 10px; font-size:12px; color:var(--ink); outline:none; }',
+      '.wb-text-input:focus { border-color:var(--gold); box-shadow:0 0 0 3px var(--gold-soft); }',
+      '.wb-checkbox-group { display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; }',
+      '.wb-checkbox-item { display:flex; align-items:center; gap:8px; padding:6px 0; }',
+      '.wb-checkbox-item input { width:18px; height:18px; cursor:pointer; }',
+      '.wb-checkbox-item label { cursor:pointer; font-size:12px; flex-grow:1; }',
+      '.wb-modal-actions { display:flex; gap:10px; justify-content:flex-end; }',
+      '.wb-modal-btn { padding:8px 14px; border-radius:10px; border:1px solid var(--rule); background:var(--surface-2); color:var(--ink); font-size:12px; font-weight:600; cursor:pointer; }',
+      '.wb-modal-btn:hover { border-color:var(--rule-strong); background:var(--surface); }',
+      '.wb-modal-btn.primary { background:var(--gold); color:var(--surface); border-color:var(--gold); }',
+      '.wb-modal-btn.primary:hover { filter:brightness(1.08); }',
+      '.wb-progress-bar-track { width:100%; height:8px; background:var(--surface-2); border-radius:6px; overflow:hidden; }',
+      '.wb-progress-bar-fill { height:100%; width:0%; background:var(--gold); transition:width .15s; }',
+      '.wb-card-preview-btn { position:absolute; bottom:4px; right:4px; z-index:6; width:20px; height:20px; border-radius:50%; border:none; background:rgba(0,0,0,.55); color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; }',
+      '.wb-card-preview-btn:hover { background:rgba(0,0,0,.8); }',
+    ].join('\n');
+    const style = document.createElement('style');
+    style.id = 'wbStyles';
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /* ---------- thumbnail generation ---------- */
+  function makeThumbnailFromElement(imgEl, maxDim) {
+    try {
+      const w0 = imgEl.naturalWidth || imgEl.width;
+      const h0 = imgEl.naturalHeight || imgEl.height;
+      if (!w0 || !h0) return null;
+      const scale = Math.min(1, maxDim / Math.max(w0, h0));
+      const w = Math.max(1, Math.round(w0 * scale));
+      const h = Math.max(1, Math.round(h0 * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(imgEl, 0, 0, w, h);
+      return canvas.toDataURL('image/jpeg', THUMB_QUALITY);
+    } catch (e) {
+      return null; // tainted canvas (no CORS) or other failure -- caller falls back to full image
+    }
+  }
+
+  function loadImageEl(url) {
+    return new Promise(function (resolve) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { resolve(null); };
+      img.src = url;
+    });
+  }
+
+  async function loadUrlAndThumbnail(url) {
+    const imgEl = await loadImageEl(url);
+    if (!imgEl) return { thumbUrl: null, ok: false };
+    if (!WB.compressorEnabled) return { thumbUrl: null, ok: true };
+    return { thumbUrl: makeThumbnailFromElement(imgEl, THUMB_MAX_DIM), ok: true };
+  }
+
+  async function runWithConcurrency(items, limit, worker) {
+    let idx = 0;
+    const results = new Array(items.length);
+    async function next() {
+      while (idx < items.length) {
+        const cur = idx++;
+        results[cur] = await worker(items[cur], cur);
+      }
+    }
+    const runners = [];
+    for (let i = 0; i < Math.min(limit, items.length); i++) runners.push(next());
+    await Promise.all(runners);
+    return results;
+  }
+
+  /* ---------- build DOM ---------- */
+  function buildView() {
+    const tabBtn = document.createElement('button');
+    tabBtn.id = 'tabWhiteboardBtn';
+    tabBtn.className = 'pill-tab';
+    tabBtn.innerHTML = '<i class="fa-solid fa-diagram-project"></i> Whiteboard';
+    RC.dom.navTabs.appendChild(tabBtn);
+    El.tabBtn = tabBtn;
+
+    const view = document.createElement('main');
+    view.id = 'whiteboardMainView';
+    view.className = 'main-panel hidden';
+    view.style.flexDirection = 'column';
+    view.innerHTML =
+      '<div class="view-toolbar wb-toolbar">' +
+        '<div>' +
+          '<div class="view-toolbar-title"><i class="fa-solid fa-diagram-project" style="color:var(--gold);"></i> Whiteboard</div>' +
+          '<div class="view-toolbar-sub">Thumbnails grouped by homework. Click any card to preview full size.</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+          '<div class="wb-tool-group">' +
+            '<button class="wb-tool-btn active" data-wb-tool="select" title="Select / move"><i class="fa-solid fa-arrow-pointer"></i></button>' +
+            '<button class="wb-tool-btn" data-wb-tool="pen" title="Pen"><i class="fa-solid fa-pen"></i></button>' +
+            '<button class="wb-tool-btn" data-wb-tool="eraser" title="Erase drawing"><i class="fa-solid fa-eraser"></i></button>' +
+          '</div>' +
+          '<div class="wb-swatches" id="wbSwatches"></div>' +
+          '<div class="wb-tool-group">' +
+            '<button class="wb-tool-btn" id="wbZoomOut" title="Zoom out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>' +
+            '<span id="wbZoomLabel" class="font-mono" style="font-size:10.5px;width:38px;text-align:center;">100%</span>' +
+            '<button class="wb-tool-btn" id="wbZoomIn" title="Zoom in"><i class="fa-solid fa-magnifying-glass-plus"></i></button>' +
+            '<button class="wb-tool-btn" id="wbZoomReset" title="Reset view"><i class="fa-solid fa-arrows-to-dot"></i></button>' +
+          '</div>' +
+          '<button class="btn" id="wbImportAllBtn"><i class="fa-solid fa-cloud-arrow-down"></i> Import all</button>' +
+          '<button class="btn" id="wbTidyBtn"><i class="fa-solid fa-table-cells"></i> Tidy grid</button>' +
+          '<button class="btn" id="wbClearDrawBtn"><i class="fa-solid fa-broom"></i> Clear drawings</button>' +
+          '<button class="btn" id="wbClearBoardBtn"><i class="fa-solid fa-trash"></i> Clear board</button>' +
+          '<span id="wbCountBadge" class="count-chip">0 images</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="wb-viewport" id="wbViewport">' +
+        '<div class="wb-canvas" id="wbCanvas">' +
+          '<svg class="wb-draw-layer" id="wbDrawLayer" xmlns="http://www.w3.org/2000/svg"></svg>' +
+        '</div>' +
+        '<div class="wb-empty" id="wbEmpty">No images yet -- use "Import all" to batch-add students by date and homework, or click the pin on photos in a student\'s thread.</div>' +
+      '</div>';
+    RC.dom.dashboardView.appendChild(view);
+
+    El.view = view;
+    El.viewport = view.querySelector('#wbViewport');
+    El.canvas = view.querySelector('#wbCanvas');
+    El.svg = view.querySelector('#wbDrawLayer');
+    El.empty = view.querySelector('#wbEmpty');
+    El.countBadge = view.querySelector('#wbCountBadge');
+    El.zoomLabel = view.querySelector('#wbZoomLabel');
+    El.swatchesWrap = view.querySelector('#wbSwatches');
+
+    PALETTE.forEach(function (c) {
+      const sw = document.createElement('button');
+      sw.className = 'wb-swatch' + (c === WB.state.color ? ' active' : '');
+      sw.style.background = c;
+      sw.dataset.color = c;
+      sw.title = 'Pen color';
+      El.swatchesWrap.appendChild(sw);
+    });
+    const customColor = document.createElement('input');
+    customColor.type = 'color';
+    customColor.className = 'wb-custom-color';
+    customColor.value = WB.state.color;
+    customColor.title = 'Custom color';
+    El.swatchesWrap.appendChild(customColor);
+    El.customColor = customColor;
+  }
+
+  /* ---------- preview: reuses Roll Call's own Lightbox (Thread view's
+     pan/zoom/rotate viewer) instead of a separate modal ---------- */
+  function openCardPreview(card) {
+    if (RC.Lightbox && typeof RC.Lightbox.open === 'function') {
+      RC.Lightbox.open(0, card.studentName, false, [card.imageUrl]);
+    }
+  }
+
+  /* ---------- import progress modal ---------- */
+  function showImportProgress(total) {
+    const overlay = document.createElement('div');
+    overlay.className = 'wb-modal-overlay';
+    const box = document.createElement('div');
+    box.className = 'wb-modal-box';
+    box.innerHTML =
+      '<div class="wb-modal-title"><i class="fa-solid fa-spinner fa-spin" style="color:var(--gold);"></i> Loading images…</div>' +
+      '<div class="wb-modal-sub" id="wbImportProgressText">0 of ' + total + '</div>' +
+      '<div class="wb-progress-bar-track"><div class="wb-progress-bar-fill" id="wbImportProgressBar"></div></div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+  function updateImportProgress(overlay, done, total) {
+    const text = overlay.querySelector('#wbImportProgressText');
+    const bar = overlay.querySelector('#wbImportProgressBar');
+    if (text) text.textContent = done + ' of ' + total;
+    if (bar) bar.style.width = Math.round((done / total) * 100) + '%';
+  }
+  function hideImportProgress(overlay) {
+    if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  }
+
+  /* ---------- import filter modal ---------- */
+  function getUniqueHomeworks() {
+    const hw = {};
+    (RC.state.students || []).forEach(function (s) {
+      if (s.homework) hw[s.homework] = true;
+    });
+    return Object.keys(hw).sort();
+  }
+
+  function openImportModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'wb-modal-overlay';
+
+    const box = document.createElement('div');
+    box.className = 'wb-modal-box';
+
+    const homeworks = getUniqueHomeworks();
+    const hwCheckboxes = homeworks.map(function (hw, i) {
+      return '<div class="wb-checkbox-item">' +
+        '<input type="checkbox" id="wbHw' + i + '" data-hw="' + escapeHtml(hw) + '" checked>' +
+        '<label for="wbHw' + i + '">' + escapeHtml(hw) + '</label>' +
+      '</div>';
+    }).join('');
+
+    box.innerHTML =
+      '<div style="border-bottom:1px solid var(--rule);padding-bottom:10px;">' +
+        '<h3 class="wb-modal-title"><i class="fa-solid fa-cloud-arrow-down" style="color:var(--gold);"></i> Import students</h3>' +
+        '<p class="wb-modal-sub">Select a date range and homework groups. Each homework gets its own bar color.</p>' +
+      '</div>' +
+      '<div class="wb-filter-section">' +
+        '<label class="wb-filter-label">Date range</label>' +
+        '<div class="wb-date-inputs">' +
+          '<input type="date" id="wbImportStartDate" class="wb-text-input">' +
+          '<input type="date" id="wbImportEndDate" class="wb-text-input">' +
+        '</div>' +
+      '</div>' +
+      '<div class="wb-filter-section">' +
+        '<label class="wb-filter-label">Homework groups</label>' +
+        '<div class="wb-checkbox-group">' + hwCheckboxes + '</div>' +
+      '</div>' +
+      '<div class="wb-modal-actions">' +
+        '<button class="wb-modal-btn" id="wbImportCancel">Cancel</button>' +
+        '<button class="wb-modal-btn primary" id="wbImportConfirm">Import</button>' +
+      '</div>';
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    const startInput = box.querySelector('#wbImportStartDate');
+    const endInput = box.querySelector('#wbImportEndDate');
+    const cancelBtn = box.querySelector('#wbImportCancel');
+    const confirmBtn = box.querySelector('#wbImportConfirm');
+
+    cancelBtn.addEventListener('click', function () {
+      overlay.parentNode.removeChild(overlay);
+    });
+
+    confirmBtn.addEventListener('click', function () {
+      const startDate = startInput.value ? new Date(startInput.value) : null;
+      const endDate = endInput.value ? new Date(endInput.value) : null;
+      const selectedHws = [];
+      box.querySelectorAll('[data-hw]').forEach(function (cb) {
+        if (cb.checked) selectedHws.push(cb.dataset.hw);
+      });
+
+      if (selectedHws.length === 0) {
+        alert('Please select at least one homework group.');
+        return;
+      }
+
+      overlay.parentNode.removeChild(overlay);
+      batchImportStudents(startDate, endDate, selectedHws);
+    });
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    });
+  }
+
+  async function batchImportStudents(startDate, endDate, homeworks) {
+    const toAdd = [];
+    (RC.state.students || []).forEach(function (s) {
+      if (homeworks.indexOf(s.homework) === -1) return;
+      if (!s.links || s.links.length === 0) return;
+
+      if (startDate || endDate) {
+        const sDate = RC.Dates ? RC.Dates.parse(s.date) : null;
+        if (startDate && sDate && sDate < startDate) return;
+        if (endDate && sDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (sDate > end) return;
+        }
+      }
+
+      // Import every image the student submitted, not just the first one.
+      s.links.forEach(function (link) {
+        toAdd.push({
+          studentId: s.id,
+          studentName: s.name,
+          homeworkTitle: s.homework,
+          imageUrl: link,
+        });
+      });
+    });
+
+    if (toAdd.length === 0) {
+      alert('No matching students found.');
+      return;
+    }
+
+    toAdd.sort(function (a, b) {
+      const hwCmp = (a.homeworkTitle || '').localeCompare(b.homeworkTitle || '');
+      if (hwCmp !== 0) return hwCmp;
+      return a.studentName.localeCompare(b.studentName);
+    });
+
+    // Assign one consistent color per homework group, in the order groups first appear.
+    const hwColorMap = {};
+    let colorIdx = 0;
+    toAdd.forEach(function (item) {
+      const key = item.homeworkTitle || '';
+      if (!(key in hwColorMap)) {
+        hwColorMap[key] = PALETTE[colorIdx % PALETTE.length];
+        colorIdx++;
+      }
+    });
+
+    // Force-load every image (with a concurrency cap) and build a compressed
+    // thumbnail for each, so nothing gets skipped for "not being loaded yet".
+    const progressOverlay = showImportProgress(toAdd.length);
+    let done = 0;
+    const loaded = await runWithConcurrency(toAdd, IMPORT_CONCURRENCY, async function (item) {
+      const result = await loadUrlAndThumbnail(item.imageUrl);
+      done++;
+      updateImportProgress(progressOverlay, done, toAdd.length);
+      return result;
+    });
+    hideImportProgress(progressOverlay);
+
+    toAdd.forEach(function (item, idx) {
+      const card = {
+        id: 'wbc_' + Date.now() + '_' + idx + '_' + Math.floor(Math.random() * 10000),
+        studentId: item.studentId,
+        studentName: item.studentName,
+        homeworkTitle: item.homeworkTitle,
+        imageUrl: item.imageUrl,
+        thumbUrl: loaded[idx] ? loaded[idx].thumbUrl : null,
+        x: 0,
+        y: 0,
+        width: WB.defaultCardWidth,
+        height: WB.defaultCardHeight,
+        barColor: hwColorMap[item.homeworkTitle || ''],
+      };
+      WB.state.cards.push(card);
+      renderCard(card);
+    });
+
+    updateEmptyState();
+    updateCount();
+    WB.tidyGridWithGrouping();
+    WB.save();
+  }
+
+  /* ---------- tab switching ---------- */
+  function showBoard() {
+    El.view.classList.remove('hidden');
+    ['chatMainView', 'galleryMainView', 'questionsMainView'].forEach(function (id) {
+      if (RC.dom[id]) RC.dom[id].classList.add('hidden');
+    });
+    [RC.dom.tabChatBtn, RC.dom.tabGalleryBtn, RC.dom.tabQuestionsBtn].forEach(function (b) {
+      if (b) b.classList.remove('active');
+    });
+    El.tabBtn.classList.add('active');
+    applyTransform();
+  }
+  function hideBoard() {
+    El.view.classList.add('hidden');
+    El.tabBtn.classList.remove('active');
+  }
+
+  /* ---------- transform / zoom / pan ---------- */
+  function applyTransform() {
+    El.canvas.style.transform = 'translate(' + WB.state.panX + 'px,' + WB.state.panY + 'px) scale(' + WB.state.zoom + ')';
+    El.zoomLabel.textContent = Math.round(WB.state.zoom * 100) + '%';
+  }
+
+  function screenToWorld(clientX, clientY) {
+    const rect = El.viewport.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left - WB.state.panX) / WB.state.zoom,
+      y: (clientY - rect.top - WB.state.panY) / WB.state.zoom,
+    };
+  }
+
+  function zoomBy(delta, centerX, centerY) {
+    const newZoom = Math.min(2.5, Math.max(0.2, WB.state.zoom + delta));
+    if (centerX == null) {
+      const rect = El.viewport.getBoundingClientRect();
+      centerX = rect.width / 2; centerY = rect.height / 2;
+    }
+    const worldX = (centerX - WB.state.panX) / WB.state.zoom;
+    const worldY = (centerY - WB.state.panY) / WB.state.zoom;
+    WB.state.panX = centerX - worldX * newZoom;
+    WB.state.panY = centerY - worldY * newZoom;
+    WB.state.zoom = newZoom;
+    applyTransform();
+    WB.save();
+  }
+
+  /* ---------- cards ---------- */
+  function paletteColorFor(index) { return PALETTE[index % PALETTE.length]; }
+
+  // Single pin-button add: reuses the already-loaded <img> element from the
+  // Chat View tile (no extra network fetch) to build a thumbnail.
+  WB.addImage = function (imgEl, btnEl) {
+    const student = RC.getStudent(RC.state.currentStudentId);
+    if (!student) return;
+    const imageUrl = imgEl.src;
+    const dup = WB.state.cards.find(function (c) { return c.imageUrl === imageUrl && c.studentId === student.id; });
+    if (dup) { flashAdded(btnEl); return; }
+    const idx = WB.state.cards.length;
+    const thumbUrl = WB.compressorEnabled ? makeThumbnailFromElement(imgEl, THUMB_MAX_DIM) : null;
+    const card = {
+      id: 'wbc_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+      studentId: student.id,
+      studentName: student.name,
+      homeworkTitle: student.homework || '',
+      imageUrl: imageUrl,
+      thumbUrl: thumbUrl,
+      x: 30 + (idx % 6) * 14,
+      y: 30 + (idx % 6) * 12,
+      width: WB.defaultCardWidth,
+      height: WB.defaultCardHeight,
+      barColor: paletteColorFor(idx),
+    };
+    WB.state.cards.push(card);
+    renderCard(card);
+    updateEmptyState();
+    updateCount();
+    WB.save();
+    flashAdded(btnEl);
+  };
+
+  function flashAdded(btnEl) {
+    if (!btnEl) return;
+    const original = btnEl.innerHTML;
+    btnEl.classList.add('wb-added');
+    btnEl.innerHTML = '<i class="fa-solid fa-check"></i>';
+    setTimeout(function () {
+      btnEl.classList.remove('wb-added');
+      btnEl.innerHTML = original;
+    }, 1000);
+  }
+
+  function updateCount() {
+    El.countBadge.textContent = WB.state.cards.length + (WB.state.cards.length === 1 ? ' image' : ' images');
+  }
+  function updateEmptyState() {
+    El.empty.style.display = WB.state.cards.length ? 'none' : 'flex';
+  }
+
+  function renderCard(card) {
+    const el = document.createElement('div');
+    el.className = 'wb-card';
+    el.dataset.id = card.id;
+    el.style.left = card.x + 'px';
+    el.style.top = card.y + 'px';
+    el.style.width = card.width + 'px';
+    el.style.height = card.height + 'px';
+    el.style.zIndex = ++zCounter;
+    const displaySrc = card.thumbUrl || card.imageUrl;
+    el.innerHTML =
+      '<div class="wb-card-bar" style="background:' + card.barColor + ';">' +
+        '<button class="wb-card-close" data-role="close" title="Remove"><i class="fa-solid fa-xmark"></i></button>' +
+        '<div class="wb-card-bar-row">' +
+          '<button class="wb-card-dot" data-role="colordot" style="background:' + card.barColor + ';" title="Bar color"></button>' +
+          '<span class="wb-card-name">' + escapeHtml(card.studentName) + '</span>' +
+        '</div>' +
+        '<span class="wb-card-hw">' + escapeHtml(card.homeworkTitle || '') + '</span>' +
+      '</div>' +
+      '<div class="wb-card-image">' +
+        '<img src="' + displaySrc + '" alt="' + escapeHtml(card.studentName) + '">' +
+        '<button class="wb-card-preview-btn" data-role="preview" title="View full size"><i class="fa-solid fa-eye"></i></button>' +
+      '</div>' +
+      '<div class="wb-resize-handle" data-role="resize"></div>';
+
+    El.canvas.appendChild(el);
+    card._el = el;
+  }
+
+  function getCardById(id) { return WB.state.cards.find(function (c) { return c.id === id; }); }
+
+  function selectOnly(id) { WB.state.selectedIds = [id]; refreshSelectionClasses(); }
+  function toggleSelect(id) {
+    const i = WB.state.selectedIds.indexOf(id);
+    if (i === -1) WB.state.selectedIds.push(id); else WB.state.selectedIds.splice(i, 1);
+    refreshSelectionClasses();
+  }
+  function clearSelection() { WB.state.selectedIds = []; refreshSelectionClasses(); }
+  function refreshSelectionClasses() {
+    WB.state.cards.forEach(function (c) {
+      if (c._el) c._el.classList.toggle('selected', WB.state.selectedIds.indexOf(c.id) !== -1);
+    });
+  }
+  function bringToFront(ids) {
+    ids.forEach(function (id) {
+      const c = getCardById(id);
+      if (c && c._el) c._el.style.zIndex = ++zCounter;
+    });
+  }
+
+  function removeCard(id) {
+    const idx = WB.state.cards.findIndex(function (c) { return c.id === id; });
+    if (idx === -1) return;
+    const c = WB.state.cards[idx];
+    if (c._el && c._el.parentNode) c._el.parentNode.removeChild(c._el);
+    WB.state.cards.splice(idx, 1);
+    WB.state.selectedIds = WB.state.selectedIds.filter(function (sid) { return sid !== id; });
+    updateEmptyState(); updateCount(); WB.save();
+  }
+
+  function openColorPalette(cardEl, card) {
+    closeAnyPalette();
+    const pop = document.createElement('div');
+    pop.className = 'wb-palette-pop';
+    PALETTE.forEach(function (c) {
+      const sw = document.createElement('button');
+      sw.className = 'wb-swatch';
+      sw.style.background = c;
+      sw.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        card.barColor = c;
+        cardEl.querySelector('.wb-card-bar').style.background = c;
+        cardEl.querySelector('[data-role="colordot"]').style.background = c;
+        closeAnyPalette();
+        WB.save();
+      });
+      pop.appendChild(sw);
+    });
+    cardEl.appendChild(pop);
+    El.openPalette = pop;
+  }
+  function closeAnyPalette() {
+    if (El.openPalette && El.openPalette.parentNode) El.openPalette.parentNode.removeChild(El.openPalette);
+    El.openPalette = null;
+  }
+
+  function tidyGridWithGrouping() {
+    const cols = 6;
+    const gap = 12;
+    const groupGap = 60;
+    let x = 30, y = 30, col = 0, lastHw = null, first = true;
+
+    WB.state.cards.forEach(function (c) {
+      if (!first && c.homeworkTitle !== lastHw) {
+        y += groupGap;
+        col = 0;
+        x = 30;
+      }
+      first = false;
+      c.x = x;
+      c.y = y;
+      c._el.style.left = c.x + 'px';
+      c._el.style.top = c.y + 'px';
+
+      col++;
+      x += c.width + gap;
+      if (col >= cols) {
+        col = 0;
+        x = 30;
+        y += c.height + gap;
+      }
+      lastHw = c.homeworkTitle;
+    });
+    WB.save();
+  }
+
+  /* ---------- pen strokes ---------- */
+  function updateStrokePath(stroke, pathEl) {
+    const pts = stroke.points;
+    let d = '';
+    for (let i = 0; i < pts.length; i += 2) {
+      d += (i === 0 ? 'M ' : 'L ') + pts[i] + ' ' + pts[i + 1] + ' ';
+    }
+    pathEl.setAttribute('d', d.trim());
+  }
+
+  /* ---------- viewport interaction ---------- */
+  function onViewportMouseDown(e) {
+    if (WB.state.tool === 'pen') {
+      closeAnyPalette();
+      const p = screenToWorld(e.clientX, e.clientY);
+      const stroke = { id: 'wbs_' + Date.now() + '_' + Math.floor(Math.random() * 10000), color: WB.state.color, points: [p.x, p.y] };
+      WB.state.strokes.push(stroke);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke', stroke.color);
+      path.setAttribute('stroke-width', '3');
+      path.dataset.id = stroke.id;
+      El.svg.appendChild(path);
+      updateStrokePath(stroke, path);
+      drag = { type: 'draw', stroke: stroke, pathEl: path };
+      return;
+    }
+
+    if (WB.state.tool === 'eraser') {
+      if (e.target.closest('path')) return;
+      closeAnyPalette();
+      El.viewport.classList.add('panning');
+      drag = { type: 'pan', startX: e.clientX, startY: e.clientY, startPanX: WB.state.panX, startPanY: WB.state.panY };
+      return;
+    }
+
+    const cardEl = e.target.closest('.wb-card');
+    const roleEl = e.target.closest('[data-role]');
+
+    if (cardEl && roleEl && roleEl.dataset.role === 'preview') {
+      e.stopPropagation();
+      openCardPreview(getCardById(cardEl.dataset.id));
+      return;
+    }
+    if (cardEl && roleEl && roleEl.dataset.role === 'resize') {
+      e.stopPropagation();
+      const card = getCardById(cardEl.dataset.id);
+      drag = { type: 'resize', id: card.id, startX: e.clientX, startY: e.clientY, startW: card.width, startH: card.height };
+      return;
+    }
+    if (cardEl && roleEl && roleEl.dataset.role === 'close') {
+      e.stopPropagation();
+      removeCard(cardEl.dataset.id);
+      return;
+    }
+    if (cardEl && roleEl && roleEl.dataset.role === 'colordot') {
+      e.stopPropagation();
+      openColorPalette(cardEl, getCardById(cardEl.dataset.id));
+      return;
+    }
+    if (cardEl) {
+      closeAnyPalette();
+      const id = cardEl.dataset.id;
+      if (e.shiftKey) {
+        toggleSelect(id);
+      } else if (WB.state.selectedIds.indexOf(id) === -1) {
+        selectOnly(id);
+      }
+      if (WB.state.selectedIds.indexOf(id) === -1) return;
+      bringToFront(WB.state.selectedIds);
+      const starts = {};
+      WB.state.selectedIds.forEach(function (sid) {
+        const c = getCardById(sid);
+        starts[sid] = { x: c.x, y: c.y };
+      });
+      drag = { type: 'move', ids: WB.state.selectedIds.slice(), starts: starts, startX: e.clientX, startY: e.clientY };
+      return;
+    }
+
+    closeAnyPalette();
+    clearSelection();
+    El.viewport.classList.add('panning');
+    drag = { type: 'pan', startX: e.clientX, startY: e.clientY, startPanX: WB.state.panX, startPanY: WB.state.panY };
+  }
+
+  function onViewportMouseMove(e) {
+    if (!drag) return;
+    if (e.buttons === 0) {
+      // The mouse button was released somewhere we didn't catch (e.g.
+      // outside the browser window). Recover instead of continuing to
+      // apply movement from a stale drag-start reference.
+      onViewportMouseUp();
+      return;
+    }
+    if (drag.type === 'pan') {
+      WB.state.panX = drag.startPanX + (e.clientX - drag.startX);
+      WB.state.panY = drag.startPanY + (e.clientY - drag.startY);
+      applyTransform();
+    } else if (drag.type === 'move') {
+      const dx = (e.clientX - drag.startX) / WB.state.zoom;
+      const dy = (e.clientY - drag.startY) / WB.state.zoom;
+      drag.ids.forEach(function (id) {
+        const c = getCardById(id);
+        const st = drag.starts[id];
+        c.x = st.x + dx; c.y = st.y + dy;
+        c._el.style.left = c.x + 'px'; c._el.style.top = c.y + 'px';
+      });
+    } else if (drag.type === 'resize') {
+      const c = getCardById(drag.id);
+      const dx = (e.clientX - drag.startX) / WB.state.zoom;
+      const dy = (e.clientY - drag.startY) / WB.state.zoom;
+      c.width = Math.max(90, drag.startW + dx);
+      c.height = Math.max(90, drag.startH + dy);
+      c._el.style.width = c.width + 'px'; c._el.style.height = c.height + 'px';
+    } else if (drag.type === 'draw') {
+      const p = screenToWorld(e.clientX, e.clientY);
+      drag.stroke.points.push(p.x, p.y);
+      updateStrokePath(drag.stroke, drag.pathEl);
+    }
+  }
+
+  function onViewportMouseUp() {
+    if (drag && drag.type === 'pan') El.viewport.classList.remove('panning');
+    drag = null;
+    WB.save();
+  }
+
+  /* ---------- toolbar ---------- */
+  function wireToolbar() {
+    El.view.querySelectorAll('[data-wb-tool]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        WB.state.tool = btn.dataset.wbTool;
+        El.view.querySelectorAll('[data-wb-tool]').forEach(function (b) { b.classList.toggle('active', b === btn); });
+        El.viewport.classList.toggle('pen-mode', WB.state.tool === 'pen');
+        El.viewport.classList.toggle('eraser-mode', WB.state.tool === 'eraser');
+        El.svg.classList.toggle('eraser-active', WB.state.tool === 'eraser');
+        if (WB.state.tool !== 'select') clearSelection();
+      });
+    });
+
+    El.swatchesWrap.querySelectorAll('.wb-swatch').forEach(function (sw) {
+      sw.addEventListener('click', function () {
+        WB.state.color = sw.dataset.color;
+        El.swatchesWrap.querySelectorAll('.wb-swatch').forEach(function (s) { s.classList.toggle('active', s === sw); });
+        El.customColor.value = WB.state.color;
+      });
+    });
+    El.customColor.addEventListener('input', function () {
+      WB.state.color = El.customColor.value;
+      El.swatchesWrap.querySelectorAll('.wb-swatch').forEach(function (s) { s.classList.remove('active'); });
+    });
+
+    El.view.querySelector('#wbZoomIn').addEventListener('click', function () { zoomBy(0.15); });
+    El.view.querySelector('#wbZoomOut').addEventListener('click', function () { zoomBy(-0.15); });
+    El.view.querySelector('#wbZoomReset').addEventListener('click', function () {
+      WB.state.zoom = 1; WB.state.panX = 40; WB.state.panY = 40; applyTransform(); WB.save();
+    });
+
+    El.view.querySelector('#wbImportAllBtn').addEventListener('click', openImportModal);
+    El.view.querySelector('#wbTidyBtn').addEventListener('click', function () { WB.tidyGridWithGrouping(); });
+    El.view.querySelector('#wbClearDrawBtn').addEventListener('click', function () {
+      if (!WB.state.strokes.length) return;
+      if (!confirm('Clear all pen drawings from the whiteboard?')) return;
+      WB.state.strokes = [];
+      El.svg.innerHTML = '';
+      WB.save();
+    });
+    El.view.querySelector('#wbClearBoardBtn').addEventListener('click', function () {
+      if (!WB.state.cards.length) return;
+      if (!confirm('Remove all images from the whiteboard? This cannot be undone.')) return;
+      WB.state.cards.forEach(function (c) { if (c._el && c._el.parentNode) c._el.parentNode.removeChild(c._el); });
+      WB.state.cards = [];
+      WB.state.selectedIds = [];
+      updateEmptyState(); updateCount(); WB.save();
+    });
+  }
+
+  /* ---------- pin buttons on Chat View media tiles ---------- */
+  function addPinButtonToTile(tile) {
+    if (tile.hasAttribute('data-wb-pin-added')) return;
+    tile.setAttribute('data-wb-pin-added', '1');
+    const btn = document.createElement('button');
+    btn.className = 'wb-add-btn';
+    btn.title = 'Add to whiteboard';
+    btn.innerHTML = '<i class="fa-solid fa-thumbtack"></i>';
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      e.preventDefault();
+      const img = tile.querySelector('img');
+      if (img && img.src) WB.addImage(img, btn);
+    });
+    tile.appendChild(btn);
+  }
+
+  function watchMediaGridImages() {
+    if (!RC.dom.mediaGrid) return;
+    const mo = new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        m.addedNodes.forEach(function (node) {
+          if (node.nodeType !== 1) return;
+          const img = node.tagName === 'IMG' ? node : node.querySelector('img');
+          if (!img) return;
+          const tile = img.closest('.media-tile');
+          if (!tile) return;
+          if (img.complete) {
+            addPinButtonToTile(tile);
+          } else {
+            img.addEventListener('load', function () {
+              addPinButtonToTile(tile);
+            }, { once: true });
+          }
+        });
+      });
+    });
+    mo.observe(RC.dom.mediaGrid, { childList: true, subtree: true });
+  }
+
+  /* ---------- init / boot ---------- */
+  WB.init = function () {
+    WB.load();
+    injectStyles();
+    buildView();
+    wireToolbar();
+
+    El.tabBtn.addEventListener('click', showBoard);
+    [RC.dom.tabChatBtn, RC.dom.tabGalleryBtn, RC.dom.tabQuestionsBtn].forEach(function (b) {
+      if (b) b.addEventListener('click', hideBoard);
+    });
+
+    El.viewport.addEventListener('mousedown', function (e) { WB.onViewportMouseDown(e); });
+    window.addEventListener('mousemove', function (e) { WB.onViewportMouseMove(e); });
+    window.addEventListener('mouseup', function () { WB.onViewportMouseUp(); });
+    El.viewport.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      const rect = El.viewport.getBoundingClientRect();
+      zoomBy(e.deltaY > 0 ? -0.1 : 0.1, e.clientX - rect.left, e.clientY - rect.top);
+    }, { passive: false });
+
+    El.svg.addEventListener('click', function (e) {
+      if (WB.state.tool !== 'eraser') return;
+      const path = e.target.closest('path');
+      if (!path) return;
+      const id = path.dataset.id;
+      WB.state.strokes = WB.state.strokes.filter(function (s) { return s.id !== id; });
+      path.parentNode.removeChild(path);
+      WB.save();
+    });
+
+    WB.state.cards.forEach(function (c) { renderCard(c); });
+    WB.state.strokes.forEach(function (s) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke', s.color);
+      path.setAttribute('stroke-width', '3');
+      path.dataset.id = s.id;
+      El.svg.appendChild(path);
+      updateStrokePath(s, path);
+    });
+    updateEmptyState();
+    updateCount();
+    applyTransform();
+
+    watchMediaGridImages();
+  };
+
+  /* ---------- expose internals so separate extension modules can hook
+     in (wrap WB.onViewportMouseDown, override WB.tidyGridWithGrouping,
+     etc.) without needing to touch or repaste this base file ---------- */
+  Object.assign(WB, {
+    getCardById: getCardById,
+    selectOnly: selectOnly,
+    toggleSelect: toggleSelect,
+    clearSelection: clearSelection,
+    refreshSelectionClasses: refreshSelectionClasses,
+    bringToFront: bringToFront,
+    removeCard: removeCard,
+    openColorPalette: openColorPalette,
+    closeAnyPalette: closeAnyPalette,
+    tidyGridWithGrouping: tidyGridWithGrouping,
+    updateStrokePath: updateStrokePath,
+    onViewportMouseDown: onViewportMouseDown,
+    onViewportMouseMove: onViewportMouseMove,
+    onViewportMouseUp: onViewportMouseUp,
+    screenToWorld: screenToWorld,
+    applyTransform: applyTransform,
+    zoomBy: zoomBy,
+    batchImportStudents: batchImportStudents,
+    openCardPreview: openCardPreview,
+    makeThumbnailFromElement: makeThumbnailFromElement,
+    loadUrlAndThumbnail: loadUrlAndThumbnail,
+    updateEmptyState: updateEmptyState,
+    updateCount: updateCount,
+    escapeHtml: escapeHtml,
+    renderCard: renderCard,
+  });
+
+  function wbBoot() {
+    if (!RC.dom || !RC.dom.navTabs || !RC.dom.dashboardView) {
+      setTimeout(wbBoot, 60);
+      return;
+    }
+    WB.init();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wbBoot);
+  } else {
+    wbBoot();
+  }
+})();
+</script>
+
+<!-- MODULE: Whiteboard Ext (v5) -->
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     EXTENSION: Whiteboard Stacking + Tabs + Fixes
+     Requires the base Whiteboard module (v7+, which exposes
+     WB.defaultCardWidth/Height and WB.compressorEnabled) to be
+     loaded BEFORE this one. Does not edit the base module.
+
+     What this adds on top of the previous extension:
+     - Bigger default card size on import/pin-add.
+     - A compressor on/off toggle (off = full-resolution images,
+       skips the compression step entirely -- meant for occasional
+       use, e.g. "emergency" close inspection, not the default).
+     - Multiple named TABS within the Whiteboard (e.g. "Class 1",
+       "Class 1 - Errors"). Cards live on one tab at a time; a new
+       "move" button on each card lets you send it to another tab.
+       All tabs share the same canvas/pan/zoom -- switching tabs
+       just shows/hides cards, it doesn't reset your view.
+     Plus everything from before: stacking, the ~16:9 per-homework
+     block layout, stack/unstack toggle, rectangle select + bulk
+     delete, Lightbox-based preview, and the hi-res swap on resize.
+     ============================================================ */
+
+  const HI_RES_THRESHOLD = 240;
+  const BLOCK_MAX_WIDTH = 900;
+  const STORAGE_KEY = 'rcWhiteboardState_v1';
+  const DEFAULT_CARD_WIDTH = 360;
+  const DEFAULT_CARD_HEIGHT = 380;
+  const DEFAULT_TAB = 'Class 1';
+  const DEFAULT_MAX_PER_ROW = 5;
+  const EXPORT_MAX_DIM = 8000;
+
+  function stackMembers(WB, card) {
+    return WB.state.cards.filter(function (c) {
+      return c.studentId === card.studentId && c.homeworkTitle === card.homeworkTitle;
+    });
+  }
+
+  function injectExtStyles() {
+    const css = [
+      '.wb-marquee { position:absolute; border:1.5px dashed var(--gold); background:rgba(156,107,31,0.12); pointer-events:none; z-index:8000; }',
+      '.wb-viewport.lasso-mode { cursor:crosshair; }',
+      '.wb-viewport.space-pan-mode { cursor:grab; }',
+      '.wb-viewport.space-pan-mode.panning { cursor:grabbing; }',
+      '.wb-card-move-btn { position:absolute; bottom:4px; left:4px; z-index:6; width:20px; height:20px; border-radius:50%; border:none; background:rgba(0,0,0,.55); color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; }',
+      '.wb-card-move-btn:hover { background:rgba(0,0,0,.8); }',
+      '.wb-card-rotate-btn { position:absolute; top:4px; right:4px; z-index:6; width:20px; height:20px; border-radius:50%; border:none; background:rgba(0,0,0,.55); color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; }',
+      '.wb-card-rotate-btn:hover { background:rgba(0,0,0,.8); }',
+      '.wb-tab-move-pop { position:absolute; bottom:28px; left:4px; z-index:6000; background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:6px; display:flex; flex-direction:column; gap:2px; min-width:170px; max-height:240px; overflow-y:auto; box-shadow:0 6px 20px var(--shadow); }',
+      '.wb-tab-move-row { display:flex; align-items:center; gap:4px; padding:3px 2px; }',
+      '.wb-tab-move-label { flex-grow:1; font-size:11.5px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }',
+      '.wb-tab-move-action { width:22px; height:22px; flex-shrink:0; border-radius:6px; border:none; background:var(--surface-2); color:var(--ink); display:flex; align-items:center; justify-content:center; font-size:10px; }',
+      '.wb-tab-move-action:hover { background:var(--gold); color:#fff; }',
+      '.wb-tab-move-empty { font-size:11px; color:var(--ink-soft); padding:4px; }',
+      '.wb-tab-bar { display:flex; align-items:center; gap:6px; padding:8px 20px; border-bottom:1px solid var(--rule); background:var(--surface); flex-wrap:wrap; }',
+      '.wb-tab-pill { position:relative; padding-right:20px; }',
+      '.wb-tab-pill-close { position:absolute; right:4px; top:50%; transform:translateY(-50%); opacity:.55; font-size:9px; }',
+      '.wb-tab-pill-close:hover { opacity:1; }',
+    ].join('\n');
+    const style = document.createElement('style');
+    style.id = 'wbExtStyles';
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
+  function applyPatch(WB) {
+    injectExtStyles();
+
+    /* ---------- bigger default cards, compressor default ---------- */
+    WB.defaultCardWidth = DEFAULT_CARD_WIDTH;
+    WB.defaultCardHeight = DEFAULT_CARD_HEIGHT;
+
+    /* ---------- restore extension-owned state (stack mode, compressor,
+       tabs, and each card's assigned tab) from the same storage key
+       the base module already uses ---------- */
+    (function loadExtState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const data = raw ? JSON.parse(raw) : {};
+        WB.state.stackMode = typeof data.stackMode === 'boolean' ? data.stackMode : true;
+        WB.compressorEnabled = typeof data.compressorEnabled === 'boolean' ? data.compressorEnabled : true;
+        WB.state.tabsList = (Array.isArray(data.tabsList) && data.tabsList.length) ? data.tabsList : [DEFAULT_TAB];
+        WB.state.activeTab = (data.activeTab && WB.state.tabsList.indexOf(data.activeTab) !== -1) ? data.activeTab : WB.state.tabsList[0];
+        WB.state.perStudentMaxPerRow = typeof data.perStudentMaxPerRow === 'number' ? data.perStudentMaxPerRow : DEFAULT_MAX_PER_ROW;
+        WB.state.maxRowsPerBlock = typeof data.maxRowsPerBlock === 'number' ? data.maxRowsPerBlock : 0;
+
+        const metaById = {};
+        if (Array.isArray(data.cards)) {
+          data.cards.forEach(function (sc) { metaById[sc.id] = { tab: sc.tab, rotation: sc.rotation }; });
+        }
+        WB.state.cards.forEach(function (c) {
+          const m = metaById[c.id] || {};
+          c.tab = m.tab || WB.state.tabsList[0];
+          c.rotation = typeof m.rotation === 'number' ? m.rotation : 0;
+        });
+      } catch (e) {
+        WB.state.stackMode = true;
+        WB.compressorEnabled = true;
+        WB.state.tabsList = [DEFAULT_TAB];
+        WB.state.activeTab = DEFAULT_TAB;
+        WB.state.perStudentMaxPerRow = DEFAULT_MAX_PER_ROW;
+        WB.state.maxRowsPerBlock = 0;
+        WB.state.cards.forEach(function (c) { c.tab = DEFAULT_TAB; c.rotation = 0; });
+      }
+    })();
+
+    const saveWithTabs = WB.save;
+    WB.save = function () {
+      saveWithTabs();
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const data = raw ? JSON.parse(raw) : {};
+        data.stackMode = WB.state.stackMode;
+        data.compressorEnabled = WB.compressorEnabled;
+        data.tabsList = WB.state.tabsList;
+        data.activeTab = WB.state.activeTab;
+        data.perStudentMaxPerRow = WB.state.perStudentMaxPerRow;
+        data.maxRowsPerBlock = WB.state.maxRowsPerBlock;
+        if (Array.isArray(data.cards)) {
+          const metaById = {};
+          WB.state.cards.forEach(function (c) { metaById[c.id] = { tab: c.tab, rotation: c.rotation || 0 }; });
+          data.cards.forEach(function (sc) {
+            const m = metaById[sc.id];
+            if (m) { sc.tab = m.tab; sc.rotation = m.rotation; }
+          });
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) { /* ignore */ }
+    };
+
+    /* ---------- undo history: every time WB.save() runs (which already
+       happens after every meaningful change -- add, remove, drag-end,
+       resize-end, tidy, import, rotate, tab move...), snapshot what the
+       board looked like right before this change, so Ctrl+Z can restore
+       it. ---------- */
+    function snapshotNow() {
+      return {
+        cards: WB.state.cards.map(function (c) {
+          return {
+            id: c.id, studentId: c.studentId, studentName: c.studentName, homeworkTitle: c.homeworkTitle,
+            imageUrl: c.imageUrl, thumbUrl: c.thumbUrl, x: c.x, y: c.y, width: c.width, height: c.height,
+            barColor: c.barColor, tab: c.tab, rotation: c.rotation || 0,
+          };
+        }),
+        strokes: WB.state.strokes,
+      };
+    }
+    const undoStack = [];
+    const MAX_UNDO = 30;
+    let lastSnapshot = JSON.stringify(snapshotNow());
+
+    const saveWithTabsAndUndo = WB.save;
+    WB.save = function () {
+      const snap = JSON.stringify(snapshotNow());
+      if (snap !== lastSnapshot) {
+        undoStack.push(lastSnapshot);
+        if (undoStack.length > MAX_UNDO) undoStack.shift();
+        lastSnapshot = snap;
+      }
+      saveWithTabsAndUndo();
+    };
+
+    function performUndo() {
+      if (!undoStack.length) { alert('Nothing to undo.'); return; }
+      const prevSnap = undoStack.pop();
+      const data = JSON.parse(prevSnap);
+
+      WB.state.cards.forEach(function (c) { if (c._el && c._el.parentNode) c._el.parentNode.removeChild(c._el); });
+      WB.state.selectedIds = [];
+      WB.state.cards = data.cards;
+      WB.state.strokes = data.strokes;
+
+      WB.state.cards.forEach(function (c) {
+        WB.renderCard(c);
+        injectCardExtras(c._el);
+        watchCardForHiRes(c._el);
+      });
+
+      WB.el.svg.innerHTML = '';
+      WB.state.strokes.forEach(function (s) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('stroke', s.color);
+        path.setAttribute('stroke-width', '3');
+        path.dataset.id = s.id;
+        WB.el.svg.appendChild(path);
+        WB.updateStrokePath(s, path);
+      });
+
+      WB.updateEmptyState();
+      WB.updateCount();
+      applyTabFilter();
+      lastSnapshot = prevSnap;
+      WB.save();
+    }
+
+    /* ---------- tab visibility filter ---------- */
+    function applyTabFilter() {
+      WB.state.cards.forEach(function (c) {
+        if (c._el) c._el.style.display = (c.tab === WB.state.activeTab) ? '' : 'none';
+      });
+      renderTabBar();
+    }
+
+    /* ---------- tab bar UI ---------- */
+    const tabBarEl = document.createElement('div');
+    tabBarEl.className = 'wb-tab-bar';
+    WB.el.view.insertBefore(tabBarEl, WB.el.viewport);
+
+    function renderTabBar() {
+      tabBarEl.innerHTML = '';
+      WB.state.tabsList.forEach(function (name) {
+        const count = WB.state.cards.filter(function (c) { return c.tab === name; }).length;
+        const pill = document.createElement('button');
+        pill.className = 'pill-tab wb-tab-pill' + (name === WB.state.activeTab ? ' active' : '');
+        pill.textContent = name + ' (' + count + ')';
+        pill.addEventListener('click', function () {
+          WB.state.activeTab = name;
+          applyTabFilter();
+          WB.save();
+        });
+        if (count === 0 && WB.state.tabsList.length > 1) {
+          const delBtn = document.createElement('span');
+          delBtn.className = 'wb-tab-pill-close';
+          delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+          delBtn.title = 'Delete empty tab';
+          delBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            WB.state.tabsList = WB.state.tabsList.filter(function (n) { return n !== name; });
+            if (WB.state.activeTab === name) WB.state.activeTab = WB.state.tabsList[0];
+            applyTabFilter();
+            WB.save();
+          });
+          pill.appendChild(delBtn);
+        }
+        tabBarEl.appendChild(pill);
+      });
+
+      const addBtn = document.createElement('button');
+      addBtn.className = 'pill-tab';
+      addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> New tab';
+      addBtn.title = 'Create a new tab';
+      addBtn.addEventListener('click', function () {
+        const name = prompt('Name this tab (e.g. "Class 1 - Errors"):');
+        if (!name) return;
+        if (WB.state.tabsList.indexOf(name) === -1) WB.state.tabsList.push(name);
+        WB.state.activeTab = name;
+        applyTabFilter();
+        WB.save();
+      });
+      tabBarEl.appendChild(addBtn);
+    }
+
+    /* ---------- move-to-tab popup ---------- */
+    let moveMenuEl = null;
+    function closeAnyMoveMenu() {
+      if (moveMenuEl && moveMenuEl.parentNode) moveMenuEl.parentNode.removeChild(moveMenuEl);
+      moveMenuEl = null;
+    }
+    function openMoveMenu(cardEl, card) {
+      closeAnyMoveMenu();
+      const pop = document.createElement('div');
+      pop.className = 'wb-tab-move-pop';
+      const others = WB.state.tabsList.filter(function (name) { return name !== card.tab; });
+      if (!others.length) {
+        const empty = document.createElement('div');
+        empty.className = 'wb-tab-move-empty';
+        empty.textContent = 'No other tabs yet -- create one first.';
+        pop.appendChild(empty);
+      }
+      others.forEach(function (name) {
+        const row = document.createElement('div');
+        row.className = 'wb-tab-move-row';
+        const label = document.createElement('span');
+        label.className = 'wb-tab-move-label';
+        label.textContent = name;
+        const moveBtn = document.createElement('button');
+        moveBtn.className = 'wb-tab-move-action';
+        moveBtn.title = 'Move to ' + name;
+        moveBtn.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
+        moveBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          card.tab = name;
+          closeAnyMoveMenu();
+          applyTabFilter();
+          WB.save();
+        });
+        const dupBtn = document.createElement('button');
+        dupBtn.className = 'wb-tab-move-action';
+        dupBtn.title = 'Duplicate to ' + name;
+        dupBtn.innerHTML = '<i class="fa-solid fa-copy"></i>';
+        dupBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          duplicateCardToTab(card, name);
+          closeAnyMoveMenu();
+        });
+        row.appendChild(label);
+        row.appendChild(moveBtn);
+        row.appendChild(dupBtn);
+        pop.appendChild(row);
+      });
+      cardEl.appendChild(pop);
+      moveMenuEl = pop;
+    }
+
+    function duplicateCardToTab(card, tabName) {
+      const clone = {
+        id: 'wbc_' + Date.now() + '_' + Math.floor(Math.random() * 100000),
+        studentId: card.studentId, studentName: card.studentName, homeworkTitle: card.homeworkTitle,
+        imageUrl: card.imageUrl, thumbUrl: card.thumbUrl,
+        x: card.x + 24, y: card.y + 24, width: card.width, height: card.height,
+        barColor: card.barColor, tab: tabName, rotation: card.rotation || 0,
+      };
+      WB.state.cards.push(clone);
+      WB.renderCard(clone);
+      injectCardExtras(clone._el);
+      watchCardForHiRes(clone._el);
+      applyTabFilter();
+      WB.save();
+    }
+
+    function applyRotation(cardEl, card) {
+      const img = cardEl.querySelector('.wb-card-image img');
+      if (img) img.style.transform = 'rotate(' + (card.rotation || 0) + 'deg)';
+    }
+
+    function injectCardExtras(cardEl) {
+      if (cardEl.dataset.wbExtrasAdded) return;
+      cardEl.dataset.wbExtrasAdded = '1';
+      const imgWrap = cardEl.querySelector('.wb-card-image');
+      if (!imgWrap) return;
+
+      const moveBtn = document.createElement('button');
+      moveBtn.className = 'wb-card-move-btn';
+      moveBtn.dataset.role = 'movetab';
+      moveBtn.title = 'Move or duplicate to another tab';
+      moveBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i>';
+      imgWrap.appendChild(moveBtn);
+
+      const rotateBtn = document.createElement('button');
+      rotateBtn.className = 'wb-card-rotate-btn';
+      rotateBtn.dataset.role = 'rotate';
+      rotateBtn.title = 'Rotate 90°';
+      rotateBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
+      imgWrap.appendChild(rotateBtn);
+
+      // Force synchronous decode so cards paint in DOM order instead of
+      // popping in out of order while large full-res images decode async.
+      const img = imgWrap.querySelector('img');
+      if (img) { img.loading = 'eager'; img.decoding = 'sync'; }
+
+      const card = WB.getCardById(cardEl.dataset.id);
+      if (card) applyRotation(cardEl, card);
+    }
+
+    /* ---------- 1. Stacked/unstacked layout, ~16:9 block per homework ---------- */
+    WB.tidyGridWithGrouping = function () {
+      const order = [];
+      const map = {};
+      WB.state.cards.forEach(function (c) {
+        const key = c.studentId + '::' + (c.homeworkTitle || '');
+        if (!map[key]) { map[key] = []; order.push(key); }
+        map[key].push(c);
+      });
+
+      const stackGapX = 26, rowGapY = 16, blockGapX = 70;
+
+      function positionStack(stack, startX, startY) {
+        if (WB.state.stackMode) {
+          let curX = startX, curY = startY;
+          let maxRight = startX, maxBottom = startY;
+          stack.forEach(function (c, i) {
+            c.x = curX; c.y = curY;
+            if (c._el) {
+              c._el.style.left = c.x + 'px';
+              c._el.style.top = c.y + 'px';
+              c._el.style.zIndex = 10 + i;
+            }
+            maxRight = Math.max(maxRight, c.x + c.width);
+            maxBottom = Math.max(maxBottom, c.y + c.height);
+            curX += 22; curY += 5;
+          });
+          return { width: maxRight - startX, height: maxBottom - startY };
+        }
+
+        const maxPerRow = Math.max(1, WB.state.perStudentMaxPerRow || 5);
+        let curX = startX, curY = startY, rowH = 0, col = 0;
+        let maxRight = startX, maxBottom = startY;
+        stack.forEach(function (c, i) {
+          c.x = curX; c.y = curY;
+          if (c._el) {
+            c._el.style.left = c.x + 'px';
+            c._el.style.top = c.y + 'px';
+            c._el.style.zIndex = 10 + i;
+          }
+          maxRight = Math.max(maxRight, c.x + c.width);
+          maxBottom = Math.max(maxBottom, c.y + c.height);
+          rowH = Math.max(rowH, c.height);
+          col++;
+          if (col >= maxPerRow) {
+            col = 0; curX = startX; curY += rowH + 8; rowH = 0;
+          } else {
+            curX += c.width + 8;
+          }
+        });
+        return { width: maxRight - startX, height: maxBottom - startY };
+      }
+
+      function estimateStackSize(stack) {
+        if (WB.state.stackMode) {
+          const last = stack[stack.length - 1];
+          return {
+            width: last.width + (stack.length - 1) * 22,
+            height: last.height + (stack.length - 1) * 5,
+          };
+        }
+        const maxPerRow = Math.max(1, WB.state.perStudentMaxPerRow || 5);
+        const perRowCount = Math.min(stack.length, maxPerRow);
+        const rows = Math.ceil(stack.length / maxPerRow);
+        let maxW = 0, maxH = 0;
+        stack.forEach(function (c) { maxW = Math.max(maxW, c.width); maxH = Math.max(maxH, c.height); });
+        return {
+          width: perRowCount * maxW + (perRowCount - 1) * 8,
+          height: rows * maxH + (rows - 1) * 8,
+        };
+      }
+
+      let blockStartX = 30, x = 30, y = 30, rowH = 0, blockWidthUsed = 0;
+      let lastHw = null, first = true, rowsUsedInBlock = 0;
+
+      function startNewBlock() {
+        blockStartX += blockWidthUsed + blockGapX;
+        x = blockStartX; y = 30; rowH = 0; blockWidthUsed = 0; rowsUsedInBlock = 0;
+      }
+
+      order.forEach(function (key) {
+        const stack = map[key];
+        const hw = stack[0].homeworkTitle;
+
+        if (!first && hw !== lastHw) {
+          startNewBlock();
+        }
+        first = false;
+
+        const est = estimateStackSize(stack);
+        const wouldWrapRow = (x + est.width > blockStartX + BLOCK_MAX_WIDTH && x > blockStartX);
+
+        if (wouldWrapRow) {
+          const maxRows = WB.state.maxRowsPerBlock;
+          if (maxRows && rowsUsedInBlock + 1 >= maxRows) {
+            // This homework's block hit its row cap -- keep going, but
+            // start a fresh column to the right instead of another row.
+            startNewBlock();
+          } else {
+            x = blockStartX;
+            y += rowH + rowGapY;
+            rowH = 0;
+            rowsUsedInBlock++;
+          }
+        }
+
+        const placed = positionStack(stack, x, y);
+        rowH = Math.max(rowH, placed.height);
+        blockWidthUsed = Math.max(blockWidthUsed, (x - blockStartX) + placed.width);
+        x += placed.width + stackGapX;
+
+        lastHw = hw;
+      });
+
+      WB.save();
+    };
+
+    /* ---------- 2. Tag newly-created cards with the active tab ---------- */
+    const baseAddImage = WB.addImage;
+    WB.addImage = function (imgEl, btnEl) {
+      const beforeCount = WB.state.cards.length;
+      baseAddImage(imgEl, btnEl);
+      if (WB.state.cards.length > beforeCount) {
+        const newCard = WB.state.cards[WB.state.cards.length - 1];
+        newCard.tab = WB.state.activeTab;
+        newCard.rotation = 0;
+        injectCardExtras(newCard._el);
+        applyTabFilter();
+        WB.save();
+      }
+    };
+
+    const baseBatchImport = WB.batchImportStudents;
+    WB.batchImportStudents = async function (startDate, endDate, homeworks) {
+      const beforeCount = WB.state.cards.length;
+      await baseBatchImport(startDate, endDate, homeworks);
+      for (let i = beforeCount; i < WB.state.cards.length; i++) {
+        WB.state.cards[i].tab = WB.state.activeTab;
+        WB.state.cards[i].rotation = 0;
+      }
+      applyTabFilter();
+      WB.save();
+    };
+
+    /* ---------- 3. Preview, stack-aware group dragging, move-to-tab,
+       and the rectangle "select area" tool ---------- */
+    const baseMouseDown = WB.onViewportMouseDown;
+    const baseMouseMove = WB.onViewportMouseMove;
+    const baseMouseUp = WB.onViewportMouseUp;
+
+    let marquee = null;
+    let marqueeEl = null;
+    let forcedPan = null;
+    let spaceHeld = false;
+
+    window.addEventListener('keydown', function (e) {
+      if (e.code !== 'Space' || spaceHeld) return;
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (WB.el.view.classList.contains('hidden')) return;
+      spaceHeld = true;
+      WB.el.viewport.classList.add('space-pan-mode');
+      e.preventDefault();
+    });
+    window.addEventListener('keyup', function (e) {
+      if (e.code !== 'Space') return;
+      spaceHeld = false;
+      WB.el.viewport.classList.remove('space-pan-mode');
+    });
+
+    function updateMarqueeEl() {
+      const rect = WB.el.viewport.getBoundingClientRect();
+      const x = Math.min(marquee.startClientX, marquee.curClientX) - rect.left;
+      const y = Math.min(marquee.startClientY, marquee.curClientY) - rect.top;
+      const w = Math.abs(marquee.curClientX - marquee.startClientX);
+      const h = Math.abs(marquee.curClientY - marquee.startClientY);
+      marqueeEl.style.left = x + 'px';
+      marqueeEl.style.top = y + 'px';
+      marqueeEl.style.width = w + 'px';
+      marqueeEl.style.height = h + 'px';
+    }
+
+    WB.onViewportMouseDown = function (e) {
+      if (moveMenuEl && !moveMenuEl.contains(e.target)) closeAnyMoveMenu();
+
+      // Force-pan no matter what's under the cursor -- cards included --
+      // so looking around never accidentally selects or moves anything.
+      if (e.button === 1 || (spaceHeld && e.button === 0)) {
+        e.preventDefault();
+        closeAnyMoveMenu();
+        WB.el.viewport.classList.add('panning');
+        forcedPan = { startX: e.clientX, startY: e.clientY, startPanX: WB.state.panX, startPanY: WB.state.panY };
+        return;
+      }
+
+      if (WB.state.tool === 'lasso') {
+        e.preventDefault();
+        marquee = { startClientX: e.clientX, startClientY: e.clientY, curClientX: e.clientX, curClientY: e.clientY };
+        marqueeEl = document.createElement('div');
+        marqueeEl.className = 'wb-marquee';
+        WB.el.viewport.appendChild(marqueeEl);
+        updateMarqueeEl();
+        return;
+      }
+
+      if (WB.state.tool === 'select') {
+        const cardEl = e.target.closest('.wb-card');
+        const roleEl = e.target.closest('[data-role]');
+
+        if (cardEl && roleEl && roleEl.dataset.role === 'rotate') {
+          e.stopPropagation();
+          const card = WB.getCardById(cardEl.dataset.id);
+          if (card) {
+            card.rotation = ((card.rotation || 0) + 90) % 360;
+            applyRotation(cardEl, card);
+            WB.save();
+          }
+          return;
+        }
+
+        if (cardEl && roleEl && roleEl.dataset.role === 'movetab') {
+          e.stopPropagation();
+          const card = WB.getCardById(cardEl.dataset.id);
+          if (card) openMoveMenu(cardEl, card);
+          return;
+        }
+
+        if (cardEl && roleEl && roleEl.dataset.role === 'preview') {
+          e.stopPropagation();
+          const card = WB.getCardById(cardEl.dataset.id);
+          if (!card) return;
+          const stack = stackMembers(WB, card);
+          const idx = stack.indexOf(card);
+          if (RC.Lightbox && typeof RC.Lightbox.open === 'function') {
+            RC.Lightbox.open(idx, card.studentName, false, stack.map(function (c) { return c.imageUrl; }));
+          }
+          return;
+        }
+
+        if (cardEl && !roleEl && !e.shiftKey && WB.state.stackMode) {
+          const card = WB.getCardById(cardEl.dataset.id);
+          if (card) {
+            const stackIds = stackMembers(WB, card).map(function (c) { return c.id; });
+            WB.state.selectedIds = stackIds;
+            WB.refreshSelectionClasses();
+          }
+        }
+      }
+
+      baseMouseDown(e);
+    };
+
+    WB.onViewportMouseMove = function (e) {
+      if (forcedPan) {
+        WB.state.panX = forcedPan.startPanX + (e.clientX - forcedPan.startX);
+        WB.state.panY = forcedPan.startPanY + (e.clientY - forcedPan.startY);
+        WB.applyTransform();
+        return;
+      }
+      if (marquee) {
+        marquee.curClientX = e.clientX;
+        marquee.curClientY = e.clientY;
+        updateMarqueeEl();
+        return;
+      }
+      baseMouseMove(e);
+    };
+
+    WB.onViewportMouseUp = function (e) {
+      if (forcedPan) {
+        WB.el.viewport.classList.remove('panning');
+        forcedPan = null;
+        WB.save();
+        return;
+      }
+      if (marquee) {
+        const p1 = WB.screenToWorld(
+          Math.min(marquee.startClientX, marquee.curClientX),
+          Math.min(marquee.startClientY, marquee.curClientY)
+        );
+        const p2 = WB.screenToWorld(
+          Math.max(marquee.startClientX, marquee.curClientX),
+          Math.max(marquee.startClientY, marquee.curClientY)
+        );
+        const ids = WB.state.cards.filter(function (c) {
+          return c.tab === WB.state.activeTab &&
+            c.x < p2.x && c.x + c.width > p1.x && c.y < p2.y && c.y + c.height > p1.y;
+        }).map(function (c) { return c.id; });
+        WB.state.selectedIds = ids;
+        WB.refreshSelectionClasses();
+
+        if (marqueeEl && marqueeEl.parentNode) marqueeEl.parentNode.removeChild(marqueeEl);
+        marqueeEl = null;
+        marquee = null;
+        return;
+      }
+      baseMouseUp(e);
+    };
+
+    /* ---------- 4. New toolbar controls ---------- */
+    const firstToolGroup = WB.el.view.querySelector('.wb-tool-group');
+    const lassoBtn = document.createElement('button');
+    lassoBtn.className = 'wb-tool-btn';
+    lassoBtn.dataset.wbTool = 'lasso';
+    lassoBtn.title = 'Select area (drag a box over many cards)';
+    lassoBtn.innerHTML = '<i class="fa-solid fa-vector-square"></i>';
+    lassoBtn.addEventListener('click', function () {
+      WB.state.tool = 'lasso';
+      document.querySelectorAll('[data-wb-tool]').forEach(function (b) { b.classList.toggle('active', b === lassoBtn); });
+      WB.el.viewport.classList.remove('pen-mode', 'eraser-mode');
+      WB.el.viewport.classList.add('lasso-mode');
+      WB.el.svg.classList.remove('eraser-active');
+    });
+    firstToolGroup.appendChild(lassoBtn);
+
+    WB.el.view.querySelectorAll('[data-wb-tool]:not([data-wb-tool="lasso"])').forEach(function (btn) {
+      btn.addEventListener('click', function () { WB.el.viewport.classList.remove('lasso-mode'); });
+    });
+
+    const controlsRow = WB.el.countBadge.parentNode;
+
+    const stackToggleBtn = document.createElement('button');
+    stackToggleBtn.className = 'btn';
+    function refreshStackToggleLabel() {
+      stackToggleBtn.innerHTML = WB.state.stackMode
+        ? '<i class="fa-solid fa-layer-group"></i> Unstack'
+        : '<i class="fa-solid fa-layer-group"></i> Stack';
+      stackToggleBtn.title = WB.state.stackMode
+        ? 'Spread each student\'s cards out so they can be moved individually'
+        : 'Fan each student\'s cards back into a stack';
+    }
+    refreshStackToggleLabel();
+    stackToggleBtn.addEventListener('click', function () {
+      WB.state.stackMode = !WB.state.stackMode;
+      refreshStackToggleLabel();
+      WB.tidyGridWithGrouping();
+    });
+    controlsRow.insertBefore(stackToggleBtn, WB.el.countBadge);
+
+    const compressorBtn = document.createElement('button');
+    compressorBtn.className = 'btn';
+    function refreshCompressorLabel() {
+      compressorBtn.innerHTML = WB.compressorEnabled
+        ? '<i class="fa-solid fa-compress"></i> Compression: On'
+        : '<i class="fa-solid fa-compress"></i> Compression: Off';
+      compressorBtn.title = WB.compressorEnabled
+        ? 'New imports use compressed thumbnails (fast). Click to switch to full-res.'
+        : 'New imports use full-resolution images (slower). Click to switch back to compressed.';
+    }
+    refreshCompressorLabel();
+    compressorBtn.addEventListener('click', function () {
+      WB.compressorEnabled = !WB.compressorEnabled;
+      refreshCompressorLabel();
+      WB.save();
+    });
+    controlsRow.insertBefore(compressorBtn, WB.el.countBadge);
+
+    const deleteSelBtn = document.createElement('button');
+    deleteSelBtn.className = 'btn';
+    deleteSelBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Delete selected';
+    deleteSelBtn.title = 'Remove every currently-selected card';
+    deleteSelBtn.addEventListener('click', function () {
+      if (!WB.state.selectedIds.length) { alert('Nothing selected. Use the "Select area" tool to drag a box over some cards first.'); return; }
+      const n = WB.state.selectedIds.length;
+      if (!confirm('Remove ' + n + ' selected card' + (n === 1 ? '' : 's') + '?')) return;
+      WB.state.selectedIds.slice().forEach(function (id) { WB.removeCard(id); });
+    });
+    controlsRow.insertBefore(deleteSelBtn, WB.el.countBadge);
+
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'btn';
+    undoBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Undo';
+    undoBtn.title = 'Undo the last change (Ctrl+Z)';
+    undoBtn.addEventListener('click', performUndo);
+    controlsRow.insertBefore(undoBtn, WB.el.countBadge);
+
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'btn';
+    settingsBtn.innerHTML = '<i class="fa-solid fa-gear"></i> Layout settings';
+    settingsBtn.title = 'Adjust images-per-row and card size for the whole board';
+    settingsBtn.addEventListener('click', openLayoutSettingsModal);
+    controlsRow.insertBefore(settingsBtn, WB.el.countBadge);
+
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn';
+    exportBtn.innerHTML = '<i class="fa-solid fa-file-image"></i> Export PNG';
+    exportBtn.title = 'Export the current tab as one PNG image';
+    exportBtn.addEventListener('click', function () { exportBoardAsPng(); });
+    controlsRow.insertBefore(exportBtn, WB.el.countBadge);
+
+    // Repurpose the existing "reset view" button into a smarter "fit all
+    // cards on this tab into view" -- much more useful than a fixed anchor,
+    // and doubles as recovery if pan/zoom ever end up far from the cards.
+    const oldResetBtn = WB.el.view.querySelector('#wbZoomReset');
+    if (oldResetBtn) {
+      const newResetBtn = oldResetBtn.cloneNode(true);
+      newResetBtn.innerHTML = '<i class="fa-solid fa-arrows-to-dot"></i>';
+      newResetBtn.title = 'Fit all cards on this tab into view';
+      oldResetBtn.parentNode.replaceChild(newResetBtn, oldResetBtn);
+      newResetBtn.addEventListener('click', fitViewToCards);
+    }
+
+    function fitViewToCards() {
+      const visible = WB.state.cards.filter(function (c) { return c.tab === WB.state.activeTab; });
+      if (!visible.length) {
+        WB.state.zoom = 1; WB.state.panX = 40; WB.state.panY = 40;
+        WB.applyTransform(); WB.save();
+        return;
+      }
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      visible.forEach(function (c) {
+        minX = Math.min(minX, c.x); minY = Math.min(minY, c.y);
+        maxX = Math.max(maxX, c.x + c.width); maxY = Math.max(maxY, c.y + c.height);
+      });
+      const boxW = Math.max(1, maxX - minX), boxH = Math.max(1, maxY - minY);
+      const rect = WB.el.viewport.getBoundingClientRect();
+      const pad = 60;
+      let newZoom = Math.min((rect.width - pad * 2) / boxW, (rect.height - pad * 2) / boxH, 2.5);
+      newZoom = Math.max(0.1, newZoom);
+      WB.state.zoom = newZoom;
+      WB.state.panX = (rect.width - boxW * newZoom) / 2 - minX * newZoom;
+      WB.state.panY = (rect.height - boxH * newZoom) / 2 - minY * newZoom;
+      WB.applyTransform();
+      WB.save();
+    }
+
+    /* ---------- layout settings modal: images-per-row + resize-all-cards ---------- */
+    function openLayoutSettingsModal() {
+      const overlay = document.createElement('div');
+      overlay.className = 'wb-modal-overlay';
+      const box = document.createElement('div');
+      box.className = 'wb-modal-box';
+      box.innerHTML =
+        '<div style="border-bottom:1px solid var(--rule);padding-bottom:10px;">' +
+          '<h3 class="wb-modal-title"><i class="fa-solid fa-table-cells" style="color:var(--gold);"></i> Layout settings</h3>' +
+          '<p class="wb-modal-sub">Controls how each student\'s images wrap when unstacked, and can resize every card on the board.</p>' +
+        '</div>' +
+        '<div class="wb-filter-section">' +
+          '<label class="wb-filter-label">Images per row (unstacked)</label>' +
+          '<input type="number" min="1" max="20" id="wbMaxPerRowInput" class="wb-text-input" value="' + (WB.state.perStudentMaxPerRow || 5) + '">' +
+        '</div>' +
+        '<div class="wb-filter-section">' +
+          '<label class="wb-filter-label">Max rows per homework block before spilling into a new column to the right (0 = unlimited)</label>' +
+          '<input type="number" min="0" max="50" id="wbMaxRowsInput" class="wb-text-input" value="' + (WB.state.maxRowsPerBlock || 0) + '">' +
+        '</div>' +
+        '<div class="wb-filter-section">' +
+          '<label class="wb-filter-label">Card size</label>' +
+          '<div class="wb-date-inputs">' +
+            '<input type="number" min="60" max="1200" id="wbCardWInput" class="wb-text-input" placeholder="Width" value="' + WB.defaultCardWidth + '">' +
+            '<input type="number" min="60" max="1200" id="wbCardHInput" class="wb-text-input" placeholder="Height" value="' + WB.defaultCardHeight + '">' +
+          '</div>' +
+          '<p class="wb-modal-sub">Width/height here also become the default size for new imports.</p>' +
+        '</div>' +
+        '<div class="wb-modal-actions">' +
+          '<button class="wb-modal-btn" id="wbLayoutCancel">Close</button>' +
+          '<button class="wb-modal-btn primary" id="wbLayoutApply">Apply</button>' +
+        '</div>';
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      box.querySelector('#wbLayoutCancel').addEventListener('click', function () { overlay.remove(); });
+      box.querySelector('#wbLayoutApply').addEventListener('click', function () {
+        const maxPerRow = parseInt(box.querySelector('#wbMaxPerRowInput').value, 10) || 5;
+        const maxRows = parseInt(box.querySelector('#wbMaxRowsInput').value, 10);
+        const newW = parseInt(box.querySelector('#wbCardWInput').value, 10);
+        const newH = parseInt(box.querySelector('#wbCardHInput').value, 10);
+        WB.state.perStudentMaxPerRow = Math.max(1, maxPerRow);
+        WB.state.maxRowsPerBlock = isNaN(maxRows) ? 0 : Math.max(0, maxRows);
+        if (newW) WB.defaultCardWidth = newW;
+        if (newH) WB.defaultCardHeight = newH;
+
+        if (newW && newH && WB.state.cards.length &&
+            confirm('Resize all ' + WB.state.cards.length + ' existing cards to ' + newW + '\u00d7' + newH + ' as well?')) {
+          WB.state.cards.forEach(function (c) {
+            c.width = newW; c.height = newH;
+            if (c._el) { c._el.style.width = newW + 'px'; c._el.style.height = newH + 'px'; }
+          });
+        }
+        WB.tidyGridWithGrouping();
+        overlay.remove();
+        WB.save();
+      });
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+    }
+
+    /* ---------- export current tab as one PNG ---------- */
+    function loadImageElLocal(url) {
+      return new Promise(function (resolve) {
+        const img = new Image();
+        if (!url || url.indexOf('data:') !== 0) img.crossOrigin = 'anonymous';
+        img.onload = function () { resolve(img); };
+        img.onerror = function () { resolve(null); };
+        img.src = url;
+      });
+    }
+
+    function showExportProgress(total) {
+      const overlay = document.createElement('div');
+      overlay.className = 'wb-modal-overlay';
+      const box = document.createElement('div');
+      box.className = 'wb-modal-box';
+      box.innerHTML =
+        '<div class="wb-modal-title"><i class="fa-solid fa-spinner fa-spin" style="color:var(--gold);"></i> Building export…</div>' +
+        '<div class="wb-modal-sub" id="wbExportProgressText">0 of ' + total + '</div>' +
+        '<div class="wb-progress-bar-track"><div class="wb-progress-bar-fill" id="wbExportProgressBar"></div></div>';
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      return overlay;
+    }
+
+    async function exportBoardAsPng() {
+      const visible = WB.state.cards.filter(function (c) { return c.tab === WB.state.activeTab; });
+      if (!visible.length) { alert('No cards on this tab to export.'); return; }
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      visible.forEach(function (c) {
+        minX = Math.min(minX, c.x); minY = Math.min(minY, c.y);
+        maxX = Math.max(maxX, c.x + c.width); maxY = Math.max(maxY, c.y + c.height);
+      });
+      const pad = 40;
+      const boxW = (maxX - minX) + pad * 2, boxH = (maxY - minY) + pad * 2;
+
+      let scale = 1;
+      if (boxW > EXPORT_MAX_DIM || boxH > EXPORT_MAX_DIM) {
+        scale = Math.min(EXPORT_MAX_DIM / boxW, EXPORT_MAX_DIM / boxH);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(boxW * scale);
+      canvas.height = Math.round(boxH * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f3ede0';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const progressOverlay = showExportProgress(visible.length);
+      let done = 0;
+
+      for (const c of visible) {
+        const src = c.thumbUrl || c.imageUrl;
+        const imgEl = await loadImageElLocal(src);
+        done++;
+        const t = progressOverlay.querySelector('#wbExportProgressText');
+        const b = progressOverlay.querySelector('#wbExportProgressBar');
+        if (t) t.textContent = done + ' of ' + visible.length;
+        if (b) b.style.width = Math.round((done / visible.length) * 100) + '%';
+
+        const cx = (c.x - minX + pad) * scale;
+        const cy = (c.y - minY + pad) * scale;
+        const cw = c.width * scale;
+        const ch = c.height * scale;
+        const barH = Math.min(34, ch * 0.18);
+
+        if (imgEl) {
+          ctx.save();
+          try {
+            ctx.translate(cx + cw / 2, cy + barH + (ch - barH) / 2);
+            ctx.rotate(((c.rotation || 0) * Math.PI) / 180);
+            ctx.drawImage(imgEl, -cw / 2, -(ch - barH) / 2, cw, ch - barH);
+          } catch (err) { /* cross-origin draw failed -- leave blank, bar/label still drawn below */ }
+          ctx.restore();
+        }
+
+        ctx.fillStyle = c.barColor || '#9c6b1f';
+        ctx.fillRect(cx, cy, cw, barH);
+        ctx.fillStyle = '#ffffff';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold ' + Math.max(9, barH * 0.4) + 'px sans-serif';
+        ctx.fillText(c.studentName || '', cx + 8, cy + barH * 0.35, cw - 16);
+        ctx.font = Math.max(8, barH * 0.32) + 'px sans-serif';
+        ctx.fillText(c.homeworkTitle || '', cx + 8, cy + barH * 0.75, cw - 16);
+      }
+
+      if (progressOverlay.parentNode) progressOverlay.parentNode.removeChild(progressOverlay);
+
+      let blob = null;
+      try {
+        blob = await new Promise(function (resolve) { canvas.toBlob(resolve, 'image/png'); });
+      } catch (err) { blob = null; }
+
+      if (!blob) {
+        alert('Export failed — one or more images could not be read for export (usually a cross-origin restriction on that image host). Try again, or export fewer cards at a time.');
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'whiteboard-' + WB.state.activeTab.replace(/[^a-z0-9]+/gi, '-') + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+
+      if (scale < 1) {
+        alert('The board was scaled down to ' + Math.round(scale * 100) + '% to keep the file size reasonable (' + EXPORT_MAX_DIM + 'px max dimension). Export fewer cards at a time for full resolution.');
+      }
+    }
+
+    /* ---------- keyboard shortcuts: Delete/Backspace to remove selected
+       cards, Ctrl+Z (or Cmd+Z) to undo -- both only while the Whiteboard
+       tab is open and no text field is focused ---------- */
+    window.addEventListener('keydown', function (e) {
+      if (WB.el.view.classList.contains('hidden')) return;
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        performUndo();
+        return;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (!WB.state.selectedIds.length) return;
+        e.preventDefault();
+        WB.state.selectedIds.slice().forEach(function (id) { WB.removeCard(id); });
+        return;
+      }
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (e.key === 'l' || e.key === 'L') {
+          e.preventDefault();
+          const btn = document.querySelector('[data-wb-tool="lasso"]');
+          if (btn) btn.click();
+          return;
+        }
+        if (e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          const btn = document.querySelector('[data-wb-tool="select"]');
+          if (btn) btn.click();
+          return;
+        }
+      }
+    });
+
+    /* ---------- 5. Full-resolution swap when a card is enlarged, plus
+       attaching the move-to-tab button to every card ---------- */
+    function watchCardForHiRes(cardEl) {
+      if (!window.ResizeObserver || cardEl.dataset.wbHiResWatched) return;
+      cardEl.dataset.wbHiResWatched = '1';
+      const ro = new ResizeObserver(function (entries) {
+        entries.forEach(function (entry) {
+          const el = entry.target;
+          const card = WB.state.cards.find(function (c) { return c._el === el; });
+          if (!card) return;
+          const img = el.querySelector('.wb-card-image img');
+          if (!img) return;
+          const big = entry.contentRect.width > HI_RES_THRESHOLD || entry.contentRect.height > HI_RES_THRESHOLD;
+          const wantSrc = big ? card.imageUrl : (card.thumbUrl || card.imageUrl);
+          if (img.getAttribute('src') !== wantSrc) img.src = wantSrc;
+        });
+      });
+      ro.observe(cardEl);
+    }
+
+    WB.state.cards.forEach(function (c) {
+      if (c._el) { watchCardForHiRes(c._el); injectCardExtras(c._el); }
+    });
+    const canvasWatcher = new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        m.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1 && node.classList && node.classList.contains('wb-card')) {
+            watchCardForHiRes(node);
+            injectCardExtras(node);
+          }
+        });
+      });
+    });
+    canvasWatcher.observe(WB.el.canvas, { childList: true });
+
+    /* ---------- disable zoom while panning -- scrolling/bumping the wheel
+       mid-drag was fighting with the pan for control of the view, which
+       is what caused the "teleporting". This runs in the capture phase so
+       it intercepts the wheel event before the base module's own zoom
+       handler ever sees it. ---------- */
+    WB.el.viewport.addEventListener('wheel', function (e) {
+      if (WB.el.viewport.classList.contains('panning')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, { passive: false, capture: true });
+
+    /* ---------- initial paint ---------- */
+    WB.el.viewport.addEventListener('auxclick', function (e) { if (e.button === 1) e.preventDefault(); });
+    WB.el.viewport.addEventListener('mousedown', function (e) { if (e.button === 1) e.preventDefault(); });
+    applyTabFilter();
+  }
+
+  function extBoot() {
+    if (!RC.Whiteboard || !RC.Whiteboard.el || !RC.Whiteboard.el.canvas) {
+      setTimeout(extBoot, 60);
+      return;
+    }
+    applyPatch(RC.Whiteboard);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', extBoot);
+  } else {
+    extBoot();
+  }
+})();
+</script>
+
+<!-- MODULE: Whiteboard full screen (v2) -->
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     PLUGIN: Whiteboard Focus Mode
+     Fully standalone -- does not modify or wrap anything in the
+     Whiteboard or Whiteboard Ext modules. Only reads their already-
+     public DOM references (RC.Whiteboard.el.*) and adds its own
+     button + a body-level CSS class that makes the whiteboard's
+     view fill the entire browser window (not the OS Fullscreen
+     API -- just as big as the browser window itself, ideal for
+     screen-recording in OBS etc). A "Back" button in the top-left
+     corner exits it; Escape does too.
+     ============================================================ */
+
+  function injectStyles() {
+    const css = [
+      '#whiteboardMainView.wb-focus-active { position:fixed !important; inset:0 !important; width:100vw !important; height:100vh !important; z-index:9000 !important; }',
+      '.wb-focus-back-btn { position:fixed; top:8px; left:8px; z-index:9999; padding:5px 10px; border-radius:8px; background:var(--ink); color:var(--bg); border:none; font-weight:600; font-size:11px; display:flex; align-items:center; gap:5px; box-shadow:0 4px 14px rgba(0,0,0,.35); cursor:pointer; }',
+      '.wb-focus-back-btn:hover { background:var(--gold); }',
+      '.wb-focus-back-btn.hidden { display:none; }',
+
+      /* Minimal top chrome while in focus mode: drop the redundant title/
+         subtitle block, shrink the toolbar and every control in it, and
+         reserve room on the left so the Back button never overlaps. */
+      '#whiteboardMainView.wb-focus-active .wb-toolbar > div:first-child { display:none; }',
+      '#whiteboardMainView.wb-focus-active .view-toolbar { padding:6px 10px 6px 84px; min-height:0; gap:6px; }',
+      '#whiteboardMainView.wb-focus-active .wb-tab-bar { padding:4px 10px; }',
+      '#whiteboardMainView.wb-focus-active .wb-tool-group { padding:2px; gap:2px; }',
+      '#whiteboardMainView.wb-focus-active .wb-tool-btn { width:22px; height:22px; font-size:10px; }',
+      '#whiteboardMainView.wb-focus-active .wb-swatch { width:13px; height:13px; }',
+      '#whiteboardMainView.wb-focus-active .wb-custom-color { width:19px; height:19px; }',
+      '#whiteboardMainView.wb-focus-active .btn { padding:4px 8px; font-size:10.5px; gap:4px; }',
+      '#whiteboardMainView.wb-focus-active .count-chip { font-size:9px; padding:1px 6px; }',
+      '#whiteboardMainView.wb-focus-active .pill-tab { padding:4px 8px; font-size:10.5px; }',
+
+      /* Popups/modals were opening BEHIND the fullscreen board (z-index
+         9000) since they normally sit much lower -- that's why buttons
+         like Import/Layout settings/color picker looked broken in focus
+         mode. Force them above it, always. */
+      '.wb-modal-overlay { z-index:9500 !important; }',
+      '.wb-palette-pop { z-index:9500 !important; }',
+      '.wb-tab-move-pop { z-index:9500 !important; }',
+      '.wb-marquee { z-index:9500 !important; }',
+    ].join('\n');
+    const style = document.createElement('style');
+    style.id = 'wbFocusModeStyles';
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
+  function init(WB) {
+    injectStyles();
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'wb-focus-back-btn hidden';
+    backBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Back';
+    document.body.appendChild(backBtn);
+
+    function enterFocusMode() {
+      WB.el.view.classList.add('wb-focus-active');
+      backBtn.classList.remove('hidden');
+    }
+    function exitFocusMode() {
+      WB.el.view.classList.remove('wb-focus-active');
+      backBtn.classList.add('hidden');
+    }
+
+    backBtn.addEventListener('click', exitFocusMode);
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && WB.el.view.classList.contains('wb-focus-active')) {
+        exitFocusMode();
+      }
+    });
+
+    const focusBtn = document.createElement('button');
+    focusBtn.className = 'btn';
+    focusBtn.innerHTML = '<i class="fa-solid fa-expand"></i> Focus mode';
+    focusBtn.title = 'Fill the whole browser window (great for screen recording) -- Esc or Back to exit';
+    focusBtn.addEventListener('click', enterFocusMode);
+
+    // Drop it in the same toolbar row as the other Whiteboard controls.
+    const controlsRow = WB.el.countBadge.parentNode;
+    controlsRow.insertBefore(focusBtn, WB.el.countBadge);
+  }
+
+  function boot() {
+    if (!RC.Whiteboard || !RC.Whiteboard.el || !RC.Whiteboard.el.countBadge) {
+      setTimeout(boot, 60);
+      return;
+    }
+    init(RC.Whiteboard);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+<!-- MODULES:END -->
+</body>
+</html>
